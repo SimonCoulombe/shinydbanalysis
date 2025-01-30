@@ -31,10 +31,15 @@ group_builder_server <- function(id, selected_table, column_info) {
     # Update available columns when table changes
     observe({
       req(selected_table(), column_info())
+
+      # Filter to only categorical columns
+      categorical_cols <- names(which(sapply(column_info(), function(x)
+        x$type != "numeric")))
+
       updateSelectizeInput(
         session,
         "group_vars",
-        choices = names(column_info()),
+        choices = categorical_cols,
         selected = character(0)
       )
     })

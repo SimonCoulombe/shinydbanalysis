@@ -1,4 +1,4 @@
-#' Simplified Summary Builder Module
+#' Summary Builder Module for dbplyr
 #' @importFrom shiny NS selectizeInput selectInput moduleServer reactive observeEvent
 NULL
 
@@ -11,24 +11,28 @@ summary_builder_ui <- function(id) {
   ns <- NS(id)
 
   list(
+    checkboxInput(
+      ns("include_count"),
+      "Include record count",
+      value = TRUE
+    ),
     selectizeInput(
       ns("metrics"),
-      "Select metrics:",
+      "Select metrics (optional):",
       choices = NULL,
       multiple = TRUE
     ),
     selectInput(
       ns("functions"),
-      "Select functions:",
+      "Select functions for metrics:",
       choices = c(
-        "Count" = "n",
-        "Sum" = "sum",
         "Mean" = "mean",
+        "Sum" = "sum",
         "Min" = "min",
         "Max" = "max"
       ),
       multiple = TRUE,
-      selected = "n"
+      selected = "mean"
     )
   )
 }
@@ -57,29 +61,30 @@ summary_builder_server <- function(id, selected_table, column_info) {
 
     # Build summary specifications
     summary_specs <- reactive({
-      req(input$metrics, input$functions)
-
-      # Create list of all metric-function combinations
       specs <- list()
-      for (metric in input$metrics) {
-        for (func in input$functions) {
-          if (func == "n") {
-            # Special case for count
+
+      # Always add count if selected
+      if (input$include_count) {
+        specs[[length(specs) + 1]] <- list(
+          metric = "*",
+          func = "count",
+          sql = "n"  # Use dplyr's n() function
+        )
+      }
+
+      # Add metric-function combinations if any metrics selected
+      if (length(input$metrics) > 0 && length(input$functions) > 0) {
+        for (metric in input$metrics) {
+          for (func in input$functions) {
             specs[[length(specs) + 1]] <- list(
               metric = metric,
               func = func,
-              sql = "COUNT(*)"
-            )
-          } else {
-            # Regular aggregate functions
-            specs[[length(specs) + 1]] <- list(
-              metric = metric,
-              func = func,
-              sql = sprintf("%s([%s])", toupper(func), metric)
+              sql = func  # Use dplyr function names directly
             )
           }
         }
       }
+
       specs
     })
 

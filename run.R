@@ -1,9 +1,12 @@
 
 # Load required packages
+library(dbplyr)
+library(dplyr)
 library(shiny)
 library(DBI)
 library(pool)
 library(RSQLite)
+library(rlang)
 
 # Source all module files
 source("R/filter_module.R")

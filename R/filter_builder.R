@@ -103,7 +103,7 @@ filter_builder_server <- function(id, selected_table, column_info) {
     where_clause <- reactive({
       where_clauses <- build_where_clauses(state$modules)
       if (length(where_clauses) > 0) {
-        paste(where_clauses, collapse = " AND ")
+        paste(where_clauses, collapse = " & ")  # Note: changed AND to &
       } else {
         ""
       }
@@ -245,66 +245,52 @@ column_exists_in_modules <- function(column_name, modules) {
 
 
 
+
+# In filter_builder.R
+
 #' Build WHERE clauses for SQL query
-
 #' @noRd
-
 build_where_clauses <- function(modules) {
+  if (length(modules) == 0) return(character(0))
 
-  lapply(modules, function(mod) {
-
+  filters <- lapply(modules, function(mod) {
     if (mod$instance$type == "numeric") {
-
       build_numeric_clause(mod)
-
     } else {
-
       build_categorical_clause(mod)
-
     }
-
   })
 
+  # Remove NULL filters
+  filters <- Filter(Negate(is.null), filters)
+
+  if (length(filters) == 0) return(character(0))
+  filters
 }
-
-
 
 #' Build numeric WHERE clause
-
 #' @noRd
-
 build_numeric_clause <- function(mod) {
-
   value <- mod$instance$value()
+  if (is.null(value) || length(value) != 2) return(NULL)
 
+  column <- mod$instance$column
   sprintf(
-
-    "[%s] >= %f AND [%s] <= %f",
-
-    mod$instance$column, value[1],
-
-    mod$instance$column, value[2]
-
+    "%s >= %f & %s <= %f",
+    column, value[1],
+    column, value[2]
   )
-
 }
 
-
-
 #' Build categorical WHERE clause
-
 #' @noRd
-
 build_categorical_clause <- function(mod) {
+  values <- mod$instance$value()
+  if (is.null(values) || length(values) == 0) return(NULL)
 
   values_str <- paste(
-
-    sprintf("'%s'", mod$instance$value()),
-
-    collapse = ","
-
+    sprintf("'%s'", values),
+    collapse = ", "
   )
-
-  sprintf("[%s] IN (%s)", mod$instance$column, values_str)
-
+  sprintf("%s %%in%% c(%s)", mod$instance$column, values_str)
 }
