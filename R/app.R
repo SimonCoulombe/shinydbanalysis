@@ -2,8 +2,23 @@
 #' @param pool Database connection pool
 #' @export
 run_app <- function(pool) {
+
   ui <- fluidPage(
-    filter_builder_ui("filters", c("iris", "mtcars"))
+    titlePanel("Dataset Filter Builder"),
+    sidebarLayout(
+      sidebarPanel(
+        filter_builder_ui("filters", allowed_tables = c("iris", "mtcars")),
+        width = 4
+      ),
+      mainPanel(
+        h3("Current Filters:"),
+        verbatimTextOutput("filters-filter_summary"),
+        br(),
+        h3("Filtered Data Preview:"),
+        tableOutput("filters-filtered_data"),
+        width = 8
+      )
+    )
   )
 
   server <- function(input, output, session) {

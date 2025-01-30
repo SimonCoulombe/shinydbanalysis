@@ -6,46 +6,31 @@
 #'
 NULL
 
-#' Create filter builder UI
+#' Create filter builder UI components
 #'
 #' @param id Character. The module ID
 #' @param allowed_tables Vector. Names of tables that can be filtered
-#' @return A Shiny UI element
+#' @return A list of Shiny UI elements
 #' @export
 filter_builder_ui <- function(id, allowed_tables) {
   ns <- NS(id)
 
-  fluidPage(
-    titlePanel("Dataset Filter Builder"),
-    sidebarLayout(
-      sidebarPanel(
-        selectInput(
-          ns("table_select"),
-          "Select table:",
-          choices = c("Select table" = "", allowed_tables)
-        ),
-        selectInput(
-          ns("add_filter"),
-          "Add filter for column:",
-          choices = c("Select column" = "")
-        ),
-        br(),
-        uiOutput(ns("filters")),
-        width = 6
-      ),
-      mainPanel(
-        h3("Current Filters:"),
-        verbatimTextOutput(ns("filter_summary")),
-        br(),
-        actionButton(
-          ns("fetch_data"),
-          "Fetch Data",
-          class = "btn-primary"
-        ),
-        h3("Filtered Data Preview:"),
-        tableOutput(ns("filtered_data")),
-        width = 6
-      )
+  list(
+    selectInput(
+      ns("table_select"),
+      "Select table:",
+      choices = c("Select table" = "", allowed_tables)
+    ),
+    selectInput(
+      ns("add_filter"),
+      "Add filter for column:",
+      choices = c("Select column" = "")
+    ),
+    uiOutput(ns("filters")),
+    actionButton(
+      ns("fetch_data"),
+      "Fetch Data",
+      class = "btn-primary"
     )
   )
 }
