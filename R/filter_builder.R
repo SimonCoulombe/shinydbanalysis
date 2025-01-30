@@ -198,18 +198,20 @@ filter_builder_server <- function(id, pool, allowed_tables) {
       }
 
       cat("\n=== Last fetched state ===\n")
-      if (length(state$last_fetched$filters) > 0) {
-        for (filter in state$last_fetched$filters) {
-          cat(filter$column, ": ")
-          if (filter$type == "numeric") {
-            cat("Range:", filter$value[1], "to", filter$value[2], "\n")
-          } else {
-            cat("Selected values:", paste(filter$value, collapse = ", "), "\n")
+            if (state$fetch_count == 0) {
+        cat("No data fetched yet")
+      } else {
+        cat("Number of rows:", state$last_fetched$count, "\n")
+        if (length(state$last_fetched$filters) > 0) {
+          for (filter in state$last_fetched$filters) {
+        cat(filter$column, ": ")
+        if (filter$type == "numeric") {
+          cat("Range:", filter$value[1], "to", filter$value[2], "\n")
+        } else {
+          cat("Selected values:", paste(filter$value, collapse = ", "), "\n")
+        }
           }
         }
-        cat("\nNumber of rows:", state$last_fetched$count)
-      } else if (state$fetch_count == 0) {
-        cat("No data fetched yet")
       }
     })
 
