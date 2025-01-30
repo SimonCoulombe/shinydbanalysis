@@ -113,10 +113,12 @@ run_app <- function(pool, column_info_dir = "column_info") {
         cat(" No summary specifications\n")
       }
 
-      cat("\nFetch button pressed:", !is.null(input[["fetcher-fetch_data"]]), "\n")
+      fetch_button <- input[["fetcher-fetch_data"]]
+      cat("\nFetch button pressed:", !is.null(fetch_button) && fetch_button > 0, "\n")
 
-      if (!is.null(fetched_data$error())) {
-        cat("\nError:", fetched_data$error(), "\n")
+      error <- fetched_data$error()
+      if (!is.null(error)) {
+        cat("\nError:", error, "\n")
       }
     })
 
@@ -128,8 +130,9 @@ run_app <- function(pool, column_info_dir = "column_info") {
 
     # Results display
     output$results <- renderTable({
-      if (!is.null(fetched_data$error())) {
-        return(data.frame(Error = fetched_data$error()))
+      error <- fetched_data$error()
+      if (!is.null(error)) {
+        return(data.frame(Error = error))
       }
       data <- fetched_data$data()
       if (is.null(data)) {
