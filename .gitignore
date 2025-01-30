@@ -1,0 +1,31 @@
+# R specific files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated files
+column_info/*.rds
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Log files
+*.log
+
+# Temporary files
+tmp/
+temp/
