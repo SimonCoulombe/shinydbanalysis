@@ -9,7 +9,6 @@ run_app <- function(pool, column_info_dir = "column_info") {
 
     sidebarLayout(
       sidebarPanel(
-        # Single table picker for all modules
         table_picker_ui("table", column_info_dir),
         hr(),
         filter_builder_ui("filters"),
@@ -18,18 +17,17 @@ run_app <- function(pool, column_info_dir = "column_info") {
         hr(),
         summary_builder_ui("summaries"),
         hr(),
-        # Important: Make sure we use the correct namespace
-        data_fetcher_ui("fetcher")
+        data_fetcher_ui("fetcher", style = "collapsible")
       ),
 
       mainPanel(
         h3("Debug Information:"),
         verbatimTextOutput("debug_output"),
         hr(),
-        h3("Current Query:"),
-        verbatimTextOutput("current_query"),
+        h3("Fetched Data :"),
+        h3("Query:"),
+        verbatimTextOutput("executed_query"),
         hr(),
-        h3("Results:"),
         tableOutput("results")
       )
     )
@@ -122,11 +120,12 @@ run_app <- function(pool, column_info_dir = "column_info") {
       }
     })
 
-    # Current query display
-    output$current_query <- renderPrint({
-      req(fetched_data$current_query())
-      cat(fetched_data$current_query())
+    # Show executed query
+    output$executed_query <- renderPrint({
+      req(fetched_data$executed_query())
+      cat(fetched_data$executed_query())
     })
+
 
     # Results display
     output$results <- renderTable({
