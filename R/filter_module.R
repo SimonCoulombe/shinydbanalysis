@@ -25,6 +25,47 @@ filter_module_ui <- function(id, column_info, initial_value = NULL) {
   create_filter_container(ns, column_info$name, filter_input)
 }
 
+
+
+#' Create filter module server
+#'
+#' @param id Character. The module ID
+#' @param column_info List. Column information
+#' @param initial_value Vector. Initial filter value(s)
+#' @return List of reactive expressions
+#' @export
+filter_module_server <- function(id, column_info, initial_value = NULL) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+
+    validate_column_info(column_info)
+    initial_value <- initial_value %||% get_default_value(column_info)
+
+    # Reactive values
+    filter_state <- reactiveVal(initial_value)
+    is_active <- reactiveVal(FALSE)
+
+    # Update filter state when input changes
+    observeEvent(input$filter_value, {
+      if (!identical(filter_state(), input$filter_value)) {
+        is_active(TRUE)
+        filter_state(input$filter_value)
+      }
+    })
+
+    # Return reactive values and metadata
+    list(
+      value = filter_state,
+      remove = reactive(input$remove),
+      column = column_info$name,
+      type = column_info$type,
+      is_active = is_active
+    )
+  })
+}
+
+
+
 #' Create filter container with improved layout
 #' @noRd
 create_filter_container <- function(ns, name, filter_input) {
