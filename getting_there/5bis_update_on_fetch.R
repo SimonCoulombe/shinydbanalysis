@@ -12,7 +12,7 @@ if(FALSE){
   col_info <- lapply(cols, function(col) {
     if(col == "Species") {
       # For known categorical column
-      values <- dbGetQuery(con, paste0("SELECT DISTINCT [", col, "] FROM iris ORDER BY [", col, "]"))[[1]]
+      values <- DBI::dbGetQuery(con, paste0("SELECT DISTINCT [", col, "] FROM iris ORDER BY [", col, "]"))[[1]]
       list(
         name = col,
         type = "categorical",
@@ -21,7 +21,7 @@ if(FALSE){
     } else if(col == "measurement_date") {
       # For date column
       range_query <- paste0("SELECT MIN([", col, "]) as min, MAX([", col, "]) as max FROM iris")
-      range_values <- dbGetQuery(con, range_query)
+      range_values <- DBI::dbGetQuery(con, range_query)
       list(
         name = col,
         type = "date",
@@ -33,7 +33,7 @@ if(FALSE){
     } else {
       # For numeric columns
       range_query <- paste0("SELECT MIN([", col, "]) as min, MAX([", col, "]) as max FROM iris")
-      range_values <- dbGetQuery(con, range_query)
+      range_values <- DBI::dbGetQuery(con, range_query)
       list(
         name = col,
         type = "numeric",
@@ -215,7 +215,7 @@ server <- function(input, output, session) {
     col_info <- lapply(cols, function(col) {
       if(col == "Species") {
         # For known categorical column
-        values <- dbGetQuery(con, paste0("SELECT DISTINCT [", col, "] FROM iris ORDER BY [", col, "]"))[[1]]
+        values <- DBI::dbGetQuery(con, paste0("SELECT DISTINCT [", col, "] FROM iris ORDER BY [", col, "]"))[[1]]
         list(
           name = col,
           type = "categorical",
@@ -224,7 +224,7 @@ server <- function(input, output, session) {
       } else {
         # For numeric columns
         range_query <- paste0("SELECT MIN([", col, "]) as min, MAX([", col, "]) as max FROM iris")
-        range_values <- dbGetQuery(con, range_query)
+        range_values <- DBI::dbGetQuery(con, range_query)
         list(
           name = col,
           type = "numeric",
@@ -429,7 +429,7 @@ server <- function(input, output, session) {
     withProgress(message = 'Fetching data...', {
       incProgress(0.3, detail = "Executing query")
       query <- isolate(query_to_run())
-      data <- dbGetQuery(con, query)
+      data <- DBI::dbGetQuery(con, query)
       incProgress(0.7, detail = "Processing results")
       return(data)
     })

@@ -2,6 +2,7 @@
 #' @importFrom dplyr group_by summarise filter tbl collect
 #' @importFrom dbplyr sql
 #' @importFrom rlang parse_expr sym syms
+#' @importFrom shiny tags tagList div span
 NULL
 
 #' Create data fetcher UI components
@@ -156,10 +157,10 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
 
           for (spec in summary_specs) {
             if (spec$func == "count") {
-              summary_exprs$record_count <- quo(n())
+              summary_exprs$record_count <- rlang::quo(n())
             } else {
               expr <- call(spec$func, sym(spec$metric))
-              summary_exprs[[paste0(spec$func, "_", spec$metric)]] <- quo(!!expr)
+              summary_exprs[[paste0(spec$func, "_", spec$metric)]] <- rlang::quo(!!expr)
             }
           }
 
@@ -190,7 +191,7 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
 
       tryCatch({
         message("Executing query...")
-        sql <- paste(capture.output(show_query(query)), collapse = "\n")
+        sql <- paste(capture.output(dplyr::show_query(query)), collapse = "\n")
         executed_query(sql)
 
         withProgress(
@@ -222,7 +223,7 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
           cat("Error building query")
         }
       } else {
-        sql <- capture.output(show_query(query))
+        sql <- capture.output(dplyr::show_query(query))
         cat(paste(sql, collapse = "\n"))
       }
     })
@@ -238,7 +239,7 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
       preview_query = reactive({
         query <- preview_query()
         if (!is.null(query)) {
-          paste(capture.output(show_query(query)), collapse = "\n")
+          paste(capture.output(dplyr::show_query(query)), collapse = "\n")
         } else {
           ""
         }
