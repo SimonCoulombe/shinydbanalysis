@@ -32,7 +32,6 @@ initialize_app <- function(pool) {
     if(!table %in% dbListTables(pool) ){
       dbWriteTable(pool, table, get(table))
     }
-
   }
 
 
