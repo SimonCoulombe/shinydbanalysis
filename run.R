@@ -8,7 +8,11 @@ library(RSQLite)
 # Source all module files
 source("R/filter_module.R")
 source("R/filter_builder.R")
+source("R/group_builder.R")
+source("R/summary_builder.R")
+source("R/data_fetcher.R")
 source("R/column_info_generator.R")
+source("R/table_picker.R")
 source("R/validation.R")
 
 pool <- dbPool(

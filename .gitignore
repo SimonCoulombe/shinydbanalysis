@@ -29,3 +29,6 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# repo.R file for feeding to claude
+repo.R
