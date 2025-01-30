@@ -1,7 +1,3 @@
-#' Summary Builder Module for dbplyr
-#' @importFrom shiny NS selectizeInput selectInput moduleServer reactive observeEvent
-NULL
-
 #' Create summary builder UI components
 #'
 #' @param id Character. The module ID
@@ -11,7 +7,7 @@ summary_builder_ui <- function(id) {
   ns <- NS(id)
 
   list(
-    checkboxInput(
+    shiny::checkboxInput(
       ns("include_count"),
       "Include record count",
       value = TRUE

@@ -1,8 +1,3 @@
-#' Simplified Filter Builder Module
-#' @importFrom shiny NS selectInput uiOutput
-#' @importFrom shiny moduleServer reactive reactiveVal observeEvent
-NULL
-
 #' Create filter builder UI components
 #'
 #' @param id Character. The module ID

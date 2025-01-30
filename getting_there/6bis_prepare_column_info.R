@@ -29,7 +29,7 @@ if(generate_column_info){
   cols <- dbListFields(con, "iris")
 
   # Get total number of rows
-  n_total <- dbGetQuery(con, "SELECT COUNT(*) as count FROM iris")$count
+  n_total <- DBI::dbGetQuery(con, "SELECT COUNT(*) as count FROM iris")$count
 
   # Create column info list
   col_info <- lapply(cols, function(col) {
@@ -39,8 +39,8 @@ if(generate_column_info){
                           WHERE [%s] IS NOT NULL
                           GROUP BY [%s]
                           LIMIT 1000", col, col, col, col)
-    sample_data <- dbGetQuery(con, values_query)
-    n_distinct <- dbGetQuery(con, sprintf("SELECT COUNT(DISTINCT [%s]) as n FROM iris", col))$n
+    sample_data <- DBI::dbGetQuery(con, values_query)
+    n_distinct <- DBI::dbGetQuery(con, sprintf("SELECT COUNT(DISTINCT [%s]) as n FROM iris", col))$n
 
     # Get the first column (the values)
     values <- sample_data[[1]]
@@ -50,7 +50,7 @@ if(generate_column_info){
       # Categorical type
       distinct_query <- sprintf("SELECT DISTINCT [%s] FROM iris WHERE [%s] IS NOT NULL ORDER BY [%s]",
                                 col, col, col)
-      distinct_values <- dbGetQuery(con, distinct_query)[[1]]
+      distinct_values <- DBI::dbGetQuery(con, distinct_query)[[1]]
       list(
         name = col,
         type = "categorical",
@@ -59,7 +59,7 @@ if(generate_column_info){
     } else {
       # Numeric type (default)
       range_query <- sprintf("SELECT MIN([%s]) as min, MAX([%s]) as max FROM iris", col, col)
-      range_values <- dbGetQuery(con, range_query)
+      range_values <- DBI::dbGetQuery(con, range_query)
       list(
         name = col,
         type = "numeric",
@@ -432,7 +432,7 @@ server <- function(input, output, session) {
     withProgress(message = 'Fetching data...', {
       incProgress(0.3, detail = "Executing query")
       query <- isolate(query_to_run())
-      data <- dbGetQuery(con, query)
+      data <- DBI::dbGetQuery(con, query)
       incProgress(0.7, detail = "Processing results")
       return(data)
     })

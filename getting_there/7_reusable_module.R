@@ -347,7 +347,7 @@ filterBuilderServer <- function(id, pool, allowed_tables) {
       withProgress(message = 'Fetching data...', {
         incProgress(0.3, detail = "Executing query")
         query <- isolate(build_query())
-        data <- dbGetQuery(pool, query)
+        data <- DBI::dbGetQuery(pool, query)
         incProgress(0.7, detail = "Processing results")
         return(data)
       })

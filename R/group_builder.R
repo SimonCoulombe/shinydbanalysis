@@ -1,7 +1,3 @@
-#' Simplified Group Builder Module
-#' @importFrom shiny NS selectizeInput moduleServer reactive
-NULL
-
 #' Create group builder UI components
 #'
 #' @param id Character. The module ID

@@ -4,6 +4,7 @@
 #' @param pool Pool object. Database connection pool
 #' @param output_dir Character. Directory to save column info files. Defaults to "column_info"
 #' @return List of column information (invisibly)
+#' 
 #' @export
 create_column_info <- function(tablename, pool, output_dir = "column_info") {
   # Input validation
@@ -32,7 +33,7 @@ create_column_info <- function(tablename, pool, output_dir = "column_info") {
     cols <- dbListFields(pool, tablename)
 
     # Get total number of rows
-    n_total <- dbGetQuery(pool, sprintf("SELECT COUNT(*) as count FROM [%s]", tablename))$count
+    n_total <- DBI::dbGetQuery(pool, sprintf("SELECT COUNT(*) as count FROM [%s]", tablename))$count
 
     # Create column info list
     col_info <- lapply(cols, function(col) {
@@ -46,9 +47,9 @@ create_column_info <- function(tablename, pool, output_dir = "column_info") {
            LIMIT 1000",
           col, col, tablename, col, col
         )
-        sample_data <- dbGetQuery(pool, values_query)
+        sample_data <- DBI::dbGetQuery(pool, values_query)
 
-        n_distinct <- dbGetQuery(
+        n_distinct <- DBI::dbGetQuery(
           pool,
           sprintf("SELECT COUNT(DISTINCT [%s]) as n FROM [%s]", col, tablename)
         )$n
@@ -62,7 +63,7 @@ create_column_info <- function(tablename, pool, output_dir = "column_info") {
             "SELECT DISTINCT [%s] FROM [%s] WHERE [%s] IS NOT NULL ORDER BY [%s]",
             col, tablename, col, col
           )
-          distinct_values <- dbGetQuery(pool, distinct_query)[[1]]
+          distinct_values <- DBI::dbGetQuery(pool, distinct_query)[[1]]
 
           list(
             name = col,
@@ -75,7 +76,7 @@ create_column_info <- function(tablename, pool, output_dir = "column_info") {
             "SELECT MIN([%s]) as min, MAX([%s]) as max FROM [%s]",
             col, col, tablename
           )
-          range_values <- dbGetQuery(pool, range_query)
+          range_values <- DBI::dbGetQuery(pool, range_query)
 
           list(
             name = col,

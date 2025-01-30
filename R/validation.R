@@ -1,8 +1,3 @@
-#' Validation utilities for the filter builder app
-#' @importFrom shiny validate need
-#'
-NULL
-
 #' Validate column information structure
 #'
 #' @param column_info List. Column information to validate

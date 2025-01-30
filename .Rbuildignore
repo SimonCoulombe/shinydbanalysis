@@ -2,3 +2,5 @@
 ^renv\.lock$
 ^LICENSE\.md$
 ^getting_there
+^.*\.Rproj$
+^\.Rproj\.user$
