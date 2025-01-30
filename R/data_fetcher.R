@@ -14,7 +14,6 @@ data_fetcher_ui <- function(id, style = "collapsible") {
   ns <- NS(id)
 
   if (style == "collapsible") {
-    # Collapsible version - unchanged
     tagList(
       div(
         style = "margin-bottom: 10px;",
@@ -82,7 +81,7 @@ data_fetcher_ui <- function(id, style = "collapsible") {
             class = "btn-primary"
           ),
           span(
-            "Hover to see SQL",
+            "Hover to preview SQL query",
             style = "margin-left: 8px; color: #666; font-size: 0.8em;"
           )
         ),
@@ -227,6 +226,9 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
         cat(paste(sql, collapse = "\n"))
       }
     })
+
+    # Ensure the query preview updates even when hidden
+    outputOptions(output, "query_preview", suspendWhenHidden = FALSE)
 
     # Return interface
     list(

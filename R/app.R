@@ -17,7 +17,7 @@ run_app <- function(pool, column_info_dir = "column_info") {
         hr(),
         summary_builder_ui("summaries"),
         hr(),
-        data_fetcher_ui("fetcher", style = "collapsible")
+        data_fetcher_ui("fetcher", style = "hover")
       ),
 
       mainPanel(
