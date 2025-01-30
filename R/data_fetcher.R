@@ -1,10 +1,3 @@
-#' Data Fetcher Module Using dbplyr
-#' @importFrom dplyr group_by summarise filter tbl collect
-#' @importFrom dbplyr sql
-#' @importFrom rlang parse_expr sym syms
-#' @importFrom shiny tags tagList div span
-NULL
-
 #' Create data fetcher UI components
 #'
 #' @param id Character. The module ID

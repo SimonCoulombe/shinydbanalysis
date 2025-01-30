@@ -1,7 +1,3 @@
-#' Table Picker Module
-#' @importFrom shiny NS selectInput moduleServer reactive
-NULL
-
 #' Create table picker UI components
 #'
 #' @param id Character. The module ID

@@ -1,7 +1,3 @@
-#' Summary Builder Module for dbplyr
-#' @importFrom shiny NS selectizeInput selectInput moduleServer reactive observeEvent checkboxInput
-NULL
-
 #' Create summary builder UI components
 #'
 #' @param id Character. The module ID

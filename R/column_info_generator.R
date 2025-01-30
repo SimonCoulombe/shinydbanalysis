@@ -4,8 +4,6 @@
 #' @param pool Pool object. Database connection pool
 #' @param output_dir Character. Directory to save column info files. Defaults to "column_info"
 #' @return List of column information (invisibly)
-#' @importFrom pool dbPool poolClose
-#' @importFrom DBI dbListTables dbWriteTable dbListFields
 #' 
 #' @export
 create_column_info <- function(tablename, pool, output_dir = "column_info") {

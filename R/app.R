@@ -1,6 +1,3 @@
-#' @import shiny
-NULL
-
 #' @title Run the Shiny Database Analysis Application
 #' 
 #' @description Launches a Shiny app for interactive database analysis with filtering, grouping, and summarization capabilities.

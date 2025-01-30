@@ -1,8 +1,4 @@
 #' Individual Filter Module with Improved Layout
-#' @importFrom shiny NS tagList div h4 sliderInput checkboxGroupInput actionButton
-#' @importFrom shiny moduleServer reactive reactiveVal observeEvent removeUI
-NULL
-
 #' Create filter module UI
 #'
 #' @param id Character. The module ID

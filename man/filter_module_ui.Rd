@@ -2,7 +2,8 @@
 % Please edit documentation in R/filter_module.R
 \name{filter_module_ui}
 \alias{filter_module_ui}
-\title{Create filter module UI}
+\title{Individual Filter Module with Improved Layout
+Create filter module UI}
 \usage{
 filter_module_ui(id, column_info, initial_value = NULL)
 }
@@ -17,5 +18,6 @@ filter_module_ui(id, column_info, initial_value = NULL)
 A Shiny UI element
 }
 \description{
+Individual Filter Module with Improved Layout
 Create filter module UI
 }
