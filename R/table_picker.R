@@ -1,3 +1,7 @@
+
+
+
+
 #' Get list of available tables with column info files
 #'
 #' @param column_info_dir Path to directory containing column info files
@@ -5,17 +9,19 @@
 #' @return Named character vector of available tables
 #' @noRd
 get_available_tables <- function(column_info_dir, pool) {
-  # Get all tables from database
-  db_tables <- dbListTables(pool)
-  
   # Get tables with column info files
   col_info_files <- list.files(column_info_dir, pattern = "^column_info_.*\\.rds$")
-  col_info_tables <- gsub("^column_info_(.+)\\.rds$", "\\1", col_info_files)
+  table_names <- gsub("^column_info_(.+)\\.rds$", "\\1", col_info_files)
+  # Convert underscore back to dot for display
+  #table_names <- gsub("_", ".", table_names, fixed = TRUE)
   
-  # Keep only tables that exist in both
-  available_tables <- intersect(db_tables, col_info_tables)
+  # Verify tables exist
+  existing_tables <- sapply(table_names, function(name) {
+    table_info <- parse_table_name(name)
+    table_exists(pool, table_info)
+  })
   
-  # Return as named vector (same names as values for selectInput)
+  available_tables <- table_names[existing_tables]
   stats::setNames(available_tables, available_tables)
 }
 
