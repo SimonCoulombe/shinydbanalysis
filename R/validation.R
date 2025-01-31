@@ -1,5 +1,4 @@
 #' Validate column information structure
-#'
 #' @param column_info List. Column information to validate
 #' @return TRUE if valid, stops with error if invalid
 #' @noRd
@@ -8,33 +7,32 @@ validate_column_info <- function(column_info) {
   if (!is.list(column_info)) {
     stop("Column info must be a list")
   }
-
+  
   # Check required fields
   required_fields <- c("name", "type", "values")
   missing_fields <- setdiff(required_fields, names(column_info))
-
   if (length(missing_fields) > 0) {
     stop(sprintf(
       "Missing required fields in column_info: %s",
       paste(missing_fields, collapse = ", ")
     ))
   }
-
+  
   # Validate type field
-  if (!column_info$type %in% c("numeric", "categorical")) {
+  if (!column_info$type %in% c("numeric", "categorical", "date")) {
     stop(sprintf(
-      "Invalid column type: %s. Must be 'numeric' or 'categorical'",
+      "Invalid column type: %s. Must be 'numeric', 'categorical', or 'date'",
       column_info$type
     ))
   }
-
+  
   # Type-specific validation
-  if (column_info$type == "numeric") {
-    validate_numeric_values(column_info$values)
-  } else {
-    validate_categorical_values(column_info$values)
-  }
-
+  switch(column_info$type,
+         "numeric" = validate_numeric_values(column_info$values),
+         "categorical" = validate_categorical_values(column_info$values),
+         "date" = validate_date_values(column_info$values)
+  )
+  
   TRUE
 }
 
@@ -197,5 +195,39 @@ validate_module_id <- function(id) {
     stop("Module ID can only contain alphanumeric characters, underscores, and hyphens")
   }
 
+  TRUE
+}
+
+
+
+#' Validate date column values
+#' @param values List. Must contain min and max dates
+#' @return TRUE if valid, stops with error if invalid
+#' @noRd
+validate_date_values <- function(values) {
+  # Check if values is a list
+  if (!is.list(values)) {
+    stop("Date values must be a list containing min and max")
+  }
+  
+  # Check required fields
+  if (!all(c("min", "max") %in% names(values))) {
+    stop("Date columns must have min and max values")
+  }
+  
+  # Check date type
+  if (!inherits(values$min, "Date") || !inherits(values$max, "Date")) {
+    stop("Min and max values must be Date objects")
+  }
+  
+  # Check min <= max
+  if (values$min > values$max) {
+    stop(sprintf(
+      "Min date (%s) must be less than or equal to max date (%s)",
+      format(values$min, "%Y-%m-%d"),
+      format(values$max, "%Y-%m-%d")
+    ))
+  }
+  
   TRUE
 }

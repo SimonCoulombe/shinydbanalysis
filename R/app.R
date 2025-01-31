@@ -95,13 +95,7 @@ run_app <- function(pool, column_info_dir = tempdir()) {
   )
   
   server <- function(input, output, session) {
-    # Clean up pool when app stops
-    onStop(function() {
-      if (DBI::dbIsValid(pool)) {
-        poolClose(pool)
-      }
-    })
-    
+
     # Initialize modules
     table_info <- table_picker_server("table", pool, column_info_dir)
     
