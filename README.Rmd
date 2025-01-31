@@ -67,7 +67,7 @@ create_column_info("diamonds", pool, "column_info")
 create_column_info("iris", pool, "column_info")
 create_column_info("gapdata", pool, "column_info")
 
-# Launch the app
+# Launch the app-
 run_app(pool, "column_info")
 
 ```
