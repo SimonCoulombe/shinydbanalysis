@@ -1,6 +1,5 @@
 #' Create data fetcher UI components
 #'
-
 #' @param id Character. The module ID
 #' @param style Character. Either "collapsible" or "hover" for the preview display style
 #' @return A Shiny UI element
@@ -97,7 +96,6 @@ data_fetcher_ui <- function(id, style = "collapsible") {
   }
 }
 
-
 #' Create data fetcher server logic
 #'
 #' @param id Character. The module ID
@@ -106,7 +104,7 @@ data_fetcher_ui <- function(id, style = "collapsible") {
 #' @param filter_builder Filter builder module instance
 #' @param group_builder Group builder module instance
 #' @param summary_builder Summary builder module instance
-#' @return List of reactive expressions for data, error state, and query information
+#' @return List of reactive expressions
 #' @export
 data_fetcher_server <- function(id, pool, table_info, filter_builder, group_builder, summary_builder) {
   moduleServer(id, function(input, output, session) {
@@ -138,18 +136,20 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
         # Get grouping variables
         group_vars <- group_builder$group_vars()
         
-        # Get summary specifications
-        summary_specs <- summary_builder$summary_specs()
-        
         # Apply grouping and summarization if specified
-        if (length(group_vars) > 0 && length(summary_specs) > 0) {
+        if (length(group_vars) > 0) {
           # Add grouping
           query <- group_by(query, !!!syms(group_vars))
           
+          # Get summary specifications
+          summary_specs <- summary_builder$summary_specs()
+          
           # Build and apply summary expressions
-          summary_exprs <- build_summary_expressions(summary_specs)
-          if (length(summary_exprs) > 0) {
-            query <- summarise(query, !!!summary_exprs)
+          if (length(summary_specs) > 0) {
+            summary_exprs <- build_summary_expressions(summary_specs)
+            if (length(summary_exprs) > 0) {
+              query <- summarise(query, !!!summary_exprs)
+            }
           }
         }
         
@@ -214,7 +214,6 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
 }
 
 # Helper Functions ----
-
 
 #' Convert dbplyr query to SQL text
 #' @param query dbplyr query object

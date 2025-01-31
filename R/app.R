@@ -33,7 +33,7 @@ run_app <- function(pool, column_info_dir = tempdir()) {
                      uiOutput("error_display"),
                      hr()
                    ),
-                   tableOutput("results")
+                   DT::dataTableOutput("results")
           ),
           tabPanel("Debug Information",
                    div(class = "debug-panel",
@@ -183,16 +183,34 @@ run_app <- function(pool, column_info_dir = tempdir()) {
     })
     
     # Results table
-    output$results <- renderTable({
+    output$results <- DT::renderDataTable({
       error <- fetched_data$error()
       if (!is.null(error)) {
         return(data.frame(Error = error))
       }
+      
       data <- fetched_data$data()
       if (is.null(data)) {
         return(data.frame(Message = "Click 'Fetch Data' to load data"))
       }
-      head(data, 10)
+      
+      # Define custom formatters for different column types
+      DT::datatable(
+        head(data, 10),
+        options = list(
+          pageLength = 10,
+          scrollX = TRUE
+        ),
+        rownames = FALSE
+      ) %>%
+        DT::formatDate(
+          columns = names(data)[sapply(data, inherits, "Date")],
+          method = "toLocaleDateString"
+        ) %>%
+        DT::formatRound(
+          columns = names(data)[sapply(data, is.numeric)],
+          digits = 2
+        )
     })
   }
   

@@ -27,7 +27,7 @@ data_fetcher_server(
 \item{summary_builder}{Summary builder module instance}
 }
 \value{
-List of reactive expressions for data, error state, and query information
+List of reactive expressions
 }
 \description{
 Create data fetcher server logic

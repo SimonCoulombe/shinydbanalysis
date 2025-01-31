@@ -7,5 +7,6 @@
 #' @importFrom tidyr drop_na
 #' @importFrom dbplyr sql
 #' @importFrom rlang parse_expr sym syms
+#' @importFrom DT renderDataTable  dataTableOutput
 #' @import shiny
 NULL
