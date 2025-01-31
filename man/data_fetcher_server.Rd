@@ -2,7 +2,7 @@
 % Please edit documentation in R/data_fetcher.R
 \name{data_fetcher_server}
 \alias{data_fetcher_server}
-\title{Create data fetcher server}
+\title{Create data fetcher server logic}
 \usage{
 data_fetcher_server(
   id,
@@ -27,8 +27,8 @@ data_fetcher_server(
 \item{summary_builder}{Summary builder module instance}
 }
 \value{
-List of reactive expressions containing fetched data and error state
+List of reactive expressions for data, error state, and query information
 }
 \description{
-Create data fetcher server
+Create data fetcher server logic
 }

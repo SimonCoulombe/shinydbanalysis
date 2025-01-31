@@ -4,3 +4,4 @@
 ^getting_there
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^README\.Rmd$

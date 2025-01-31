@@ -4,35 +4,13 @@
 \alias{run_app}
 \title{Run the Shiny Database Analysis Application}
 \usage{
-run_app(
-  pool = NULL,
-  dbname = ":memory:",
-  column_info_dir = tempdir(),
-  example_data = TRUE
-)
+run_app(pool, column_info_dir = tempdir())
 }
 \arguments{
-\item{pool}{A database connection pool object (optional). If not provided,
-the app will create a new SQLite connection.}
+\item{pool}{A database connection pool object}
 
-\item{dbname}{Path to SQLite database file (ignored if pool is provided).
-Defaults to an in-memory database.}
-
-\item{column_info_dir}{Directory to store/generate column information files.
-Defaults to temporary directory.}
-
-\item{example_data}{Whether to load example iris and mtcars data into the database.
-Defaults to TRUE.}
+\item{column_info_dir}{Directory containing column information files}
 }
 \description{
-Launches a Shiny app for interactive database analysis with filtering, grouping, and summarization capabilities.
-}
-\examples{
-\dontrun{
-# Launch with default settings (in-memory database)
-shinydbanalysis::run_app()
-
-# Use persistent database
-shinydbanalysis::run_app(dbname = "my_data.db")
-}
+Run the Shiny Database Analysis Application
 }

@@ -4,7 +4,7 @@
 \alias{table_picker_server}
 \title{Create table picker server}
 \usage{
-table_picker_server(id, column_info_dir)
+table_picker_server(id, pool, column_info_dir)
 }
 \arguments{
 \item{id}{Character. The module ID}
@@ -12,7 +12,7 @@ table_picker_server(id, column_info_dir)
 \item{column_info_dir}{Path to directory containing column info files}
 }
 \value{
-Reactive expression containing selected table and column info
+List of reactive expressions
 }
 \description{
 Create table picker server
