@@ -53,25 +53,26 @@ library(shinydbanalysis)
 library(duckdb)
 library(pool)
 library(ggplot2)  # for the diamonds dataset
+library(gapminder) # for gapminder dataset 
 
+
+gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01"))) %>% filter(year >= 1990)
 # Create a DuckDB connection pool (in-memory database)
 pool <- dbPool(
   drv = duckdb::duckdb(),
   dbdir = ":memory:"
 )
 
-# Create column_info directory
-dir.create("column_info", showWarnings = FALSE)
-
 # Load some example datasets
-dbWriteTable(pool, "diamonds", ggplot2::diamonds)
-dbWriteTable(pool, "iris", iris)
-#dbWriteTable(pool, "mtcars", mtcars)
+dbWriteTable(pool, SQL("diamonds"), ggplot2::diamonds)    # using the SQL() functions helps when trying to write a table to a schema, and doesnt hurt otherwise.
+dbWriteTable(pool, SQL("iris"), iris)
+dbWriteTable(pool, SQL("gapdata"), gapdata)
+
 
 # Generate column information for each table
 create_column_info("diamonds", pool, "column_info")
 create_column_info("iris", pool, "column_info")
-#create_column_info("mtcars", pool, "column_info")
+create_column_info("gapdata", pool, "column_info")
 
 # Launch the app
 run_app(pool, "column_info")
@@ -203,6 +204,8 @@ connection examples:
 
 ### SQLite
 
+**WARNING: SQLITE DOESNT PLAY NICE WITH DATES**
+
 ``` r
 library(RSQLite)
 pool <- dbPool(
@@ -221,39 +224,7 @@ create_column_info("mtcars", pool, "column_info")
 run_app(pool, "column_info")
 ```
 
-## Example with date column
-
-``` r
-library(gapminder)
-library(shinydbanalysis)
-library(duckdb)
-library(pool)
-library(ggplot2)  # for the diamonds dataset
-
-gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01"))) %>% filter(year >= 1990)
-
-
-# Create a DuckDB connection pool (in-memory database)
-pool <- dbPool(
-  drv = duckdb::duckdb(),
-  dbdir = ":memory:"
-)
-
-# Create column_info directory
-dir.create("column_info", showWarnings = FALSE)
-
-# Load some example datasets
-dbWriteTable(pool, "gapdata", gapdata)
-
-
-# Generate column information for each table
-create_column_info("gapdata", pool, "column_info")
-
-# Launch the app
-run_app(pool, "column_info")
-```
-
-## Debug Panel
+## Debug Panel in the default app
 
 The debug panel shows: - Currently selected table - Active filters and
 their conditions - Grouping variables - Requested summary calculations -

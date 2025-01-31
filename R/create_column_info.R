@@ -8,14 +8,18 @@
 
 #' @export
 create_column_info <- function(tablename, pool, output_dir = "column_info") {
+  table_info <- parse_table_name(tablename)
+  
   # Input validation
   if (!is.character(tablename) || length(tablename) != 1) {
     stop("tablename must be a single character string")
-  }
+  }  
   
+  # pool validation 
   if (!inherits(pool, "Pool")) {
     stop("pool must be a valid database connection pool")
-  }
+  }  
+  
   
   # Create output directory if it doesn't exist
   if (!dir.exists(output_dir)) {
@@ -23,29 +27,34 @@ create_column_info <- function(tablename, pool, output_dir = "column_info") {
   }
   
   tryCatch({
-    # Verify table exists
-    tables <- dbListTables(pool)
-    if (!tablename %in% tables) {
+    if (!table_exists(pool, table_info)) {
       stop(sprintf("Table '%s' not found in database", tablename))
     }
     
-    # Get table reference using dbplyr
-    tbl_ref <- tbl(pool, tablename)
+    # Create safe filename  (not used because I use _ in schema names..)
+    #safe_name <- make_safe_filename(tablename)
+    output_file <- file.path(output_dir, sprintf("column_info_%s.rds", tablename))
+    
+    # Get table reference
+    tbl_ref <- create_table_ref(pool, table_info)
     
     # Get column types by examining first row
     sample_data <- tbl_ref %>% 
       head(1) %>% 
       collect()
-    
+    message("fetching column_types")
     column_types <- lapply(sample_data, class)
-    
+    message("column_types =" , column_types)
     # Get total number of rows
+    message("fetching number of rows")
     n_total <- tbl_ref %>%
       summarise(count = n()) %>%
       pull(count)
-    
+    message("number of rows: ", n_total)
     # Create column info list
+    message("Create column info list (min and max for numeric and dates,  distinct values for categorical)")
     col_info <- lapply(names(column_types), function(col) {
+      message("col = ", col)
       tryCatch({
         col_class <- column_types[[col]][1]  # Get primary class
         
@@ -132,7 +141,6 @@ create_column_info <- function(tablename, pool, output_dir = "column_info") {
     }
     
     # Save to file
-    output_file <- file.path(output_dir, sprintf("column_info_%s.rds", tablename))
     saveRDS(col_info, output_file)
     message(sprintf("\nColumn info saved to: %s", output_file))
     
