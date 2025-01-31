@@ -7,6 +7,37 @@ A database-agnostic Shiny package for interactive data analysis with
 filtering, grouping, and summarization capabilities. Works with any
 database supported by dbplyr.
 
+The goal is to allow the user to easily interact with tables that are
+lazy-loaded in a SQL database.  
+Lazy loading is great as it saves on RAM and all the computations happen
+on the SQL server.  
+I wanted the user to be able to easily pick filters like in the
+{shinyDataFilter} package, which sadly doesnt support databases at the
+moment.  
+I found that querying the databases “on the fly” to get the column names
+or the distinct values of each columns takes a while and makes my apps
+unenjoyable to use. The idea I came up with is to get ALL the distinct
+values in a script in a script that lives in a cronjob, then have the
+shiny app simply load these distinct values (and column data types) at
+startup.
+
+The {shinydbanalysis} offer the following modules you can use in your
+own apps:
+
+- table_picker_server() , allows the user to pick the table they want to
+  use. The table must exist in the pool and also have had
+  `create_column_info("tablename", pool, "column_info")` run to create
+  it’s metadata file.  
+- filter_builder_server() allows the user to create the filters they
+  want.  
+- group_builder_server() allows the user to select the grouping
+  (categorical) variables they want to use  
+- summary_builder_server() allows the user to select the summary
+  functions they want to use (count, max, min ,mean) and on which
+  (numeric) variables they want to apply them  
+- data_fetcher_server() creates a sql query from all of the above and
+  returns the fetched table.
+
 ## Installation
 
 ``` r
@@ -14,7 +45,7 @@ database supported by dbplyr.
 devtools::install_github("SimonCoulombe/shinydbanalysis")
 ```
 
-## Quick Start: Built-in App with Example Data
+## Quick Start: Built-in App “run_app” with Example Data
 
 ``` r
 
@@ -46,10 +77,17 @@ create_column_info("iris", pool, "column_info")
 run_app(pool, "column_info")
 ```
 
-## Building a Custom App
+<figure>
+<img src="man/figures/dataset_analysis_tool.png"
+alt="Dataset Analysis Tool" />
+<figcaption aria-hidden="true">Dataset Analysis Tool</figcaption>
+</figure>
+
+## Building a Custom App (Diamond Analysis)
 
 For more control, you can build your own Shiny app using the package’s
-components:
+components. Here we build a custom app that will plot the diamond data
+when it isnt grouped.
 
 ``` r
 
@@ -99,7 +137,7 @@ server <- function(input, output, session) {
   })
   
   # Initialize modules
-  table_info <- table_picker_server("table", "column_info")
+  table_info <- table_picker_server("table", pool,  "column_info")
   
   filter_results <- filter_builder_server(
     "filters",
@@ -159,6 +197,11 @@ server <- function(input, output, session) {
 shinyApp(ui = ui, server = server)
 ```
 
+<figure>
+<img src="man/figures/diamond_analysis.png" alt="Diamond Analysis" />
+<figcaption aria-hidden="true">Diamond Analysis</figcaption>
+</figure>
+
 ## Using Different Databases
 
 The package works with any database supported by dbplyr. Here are some
@@ -182,19 +225,6 @@ create_column_info("mtcars", pool, "column_info")
 
 # Launch the app
 run_app(pool, "column_info")
-```
-
-### PostgreSQL
-
-``` r
-library(RPostgres)
-pool <- dbPool(
-  drv = Postgres(),
-  dbname = "mydb",
-  host = "localhost",
-  user = "myuser",
-  password = "mypass"
-)
 ```
 
 ## Debug Panel

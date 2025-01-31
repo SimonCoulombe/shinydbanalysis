@@ -4,7 +4,7 @@
 \alias{table_picker_server}
 \title{Create table picker server}
 \usage{
-table_picker_server(id, column_info_dir)
+table_picker_server(id, pool, column_info_dir)
 }
 \arguments{
 \item{id}{Character. The module ID}

@@ -70,7 +70,7 @@ table_picker_ui <- function(id, column_info_dir) {
 #' @param column_info_dir Path to directory containing column info files
 #' @return List of reactive expressions
 #' @export
-table_picker_server <- function(id, column_info_dir) {
+table_picker_server <- function(id, pool, column_info_dir) {
   moduleServer(id, function(input, output, session) {
     
     # Update available tables

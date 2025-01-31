@@ -103,7 +103,7 @@ run_app <- function(pool, column_info_dir = tempdir()) {
     })
     
     # Initialize modules
-    table_info <- table_picker_server("table", column_info_dir)
+    table_info <- table_picker_server("table", pool, column_info_dir)
     
     filter_results <- filter_builder_server(
       "filters",
