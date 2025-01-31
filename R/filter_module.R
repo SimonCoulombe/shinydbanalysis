@@ -1,4 +1,4 @@
-#' Individual Filter Module with Improved Layout and Date Support
+#' Individual Filter Module with Enhanced UI Features
 #' Create filter module UI
 #'
 #' @param id Character. The module ID
@@ -11,15 +11,39 @@ filter_module_ui <- function(id, column_info, initial_value = NULL) {
   
   # Add validation for column_info
   if (is.null(column_info) || !is.list(column_info)) {
-    return(NULL)  # Return NULL instead of erroring
+    return(NULL)
   }
   
   validate_column_info(column_info)
-  initial_value <- initial_value %||% get_default_value(column_info)
+  
+  # Modify default value behavior for categorical columns
+  if (is.null(initial_value)) {
+    initial_value <- get_default_value(column_info)
+  }
+  
+  # Check for categorical columns with too many distinct values
+  if (column_info$type == "categorical" && length(column_info$values) > 300) {
+    return(div(
+      class = "alert alert-warning",
+      sprintf("Filter disabled for '%s': Too many distinct values (>300)", column_info$name)
+    ))
+  }
   
   filter_input <- create_filter_input(ns, column_info, initial_value)
   create_filter_container(ns, column_info$name, filter_input)
 }
+
+#' Create appropriate filter input based on column type
+#' @noRd
+create_filter_input <- function(ns, column_info, initial_value) {
+  switch(column_info$type,
+         "numeric" = create_numeric_input(ns, column_info, initial_value),
+         "categorical" = create_categorical_input(ns, column_info, initial_value),
+         "date" = create_date_input(ns, column_info, initial_value),
+         stop(paste("Unsupported filter type:", column_info$type))
+  )
+}
+
 
 #' Create filter module server
 #'
@@ -33,19 +57,38 @@ filter_module_server <- function(id, column_info, initial_value = NULL) {
     ns <- session$ns
     
     validate_column_info(column_info)
-    initial_value <- initial_value %||% get_default_value(column_info)
+    if (is.null(initial_value)) {
+      initial_value <- get_default_value(column_info)
+    }
     
     # Reactive values
     filter_state <- reactiveVal(initial_value)
     is_active <- reactiveVal(FALSE)
     
+    # Handle select all/deselect all for categorical inputs
+    if (column_info$type == "categorical") {
+      observeEvent(input$select_all, {
+        if (length(column_info$values) > 8) {
+          updateSelectizeInput(session, "filter_value", selected = column_info$values)
+        } else {
+          updateCheckboxGroupInput(session, "filter_value", selected = column_info$values)
+        }
+      })
+      
+      observeEvent(input$deselect_all, {
+        if (length(column_info$values) > 8) {
+          updateSelectizeInput(session, "filter_value", selected = character(0))
+        } else {
+          updateCheckboxGroupInput(session, "filter_value", selected = character(0))
+        }
+      })
+    }
+    
     # Helper function to compare values accounting for different types
     values_differ <- function(old_val, new_val) {
       if (column_info$type == "date") {
-        # For dates, compare each element separately
         !identical(as.character(old_val), as.character(new_val))
       } else {
-        # For other types, use standard comparison
         !identical(old_val, new_val)
       }
     }
@@ -54,9 +97,7 @@ filter_module_server <- function(id, column_info, initial_value = NULL) {
     observeEvent(input$filter_value, {
       current_state <- filter_state()
       
-      # Handle different input types
       if (column_info$type == "date") {
-        # Ensure input is a valid date range
         if (length(input$filter_value) == 2 && 
             !is.na(input$filter_value[1]) && 
             !is.na(input$filter_value[2])) {
@@ -66,7 +107,6 @@ filter_module_server <- function(id, column_info, initial_value = NULL) {
           }
         }
       } else {
-        # Existing logic for other types
         if (values_differ(current_state, input$filter_value)) {
           is_active(TRUE)
           filter_state(input$filter_value)
@@ -152,17 +192,92 @@ create_numeric_input <- function(ns, column_info, initial_value) {
   )
 }
 
-#' Create categorical checkbox input
+#' Create categorical input with enhanced UI features
 #' @noRd
 create_categorical_input <- function(ns, column_info, initial_value) {
-  checkboxGroupInput(
-    inputId = ns("filter_value"),
-    label = NULL,
-    choices = column_info$values,
-    selected = initial_value,
-    width = "100%"  # Make checkboxes take full width
-  )
+  n_values <- length(column_info$values)
+  
+  # For many values, start with none selected unless specified
+  if (n_values > 8 && is.null(initial_value)) {
+    initial_value <- character(0)
+  }
+  
+  if (n_values > 8) {
+    # Use selectize input for many values
+    tagList(
+      div(
+        style = "margin-bottom: 10px;",
+        div(
+          style = "display: flex; justify-content: space-between; align-items: center;",
+          span(
+            class = "text-muted",
+            style = "font-size: 0.9em;",
+            sprintf("%d available values", n_values)
+          ),
+          div(
+            style = "display: flex; gap: 10px;",
+            actionButton(
+              inputId = ns("select_all"),
+              label = "Select All",
+              class = "btn-sm"
+            ),
+            actionButton(
+              inputId = ns("deselect_all"),
+              label = "Clear",
+              class = "btn-sm"
+            )
+          )
+        )
+      ),
+      selectizeInput(
+        inputId = ns("filter_value"),
+        label = NULL,
+        choices = column_info$values,
+        selected = initial_value,
+        multiple = TRUE,
+        options = list(
+          plugins = list('remove_button'),
+          placeholder = sprintf('Select values (up to %d)...', n_values),
+          searchField = 'label',
+          sortField = 'label',
+          maxItems = n_values,
+          maxOptions = n_values,
+          hideSelected = FALSE,
+          closeAfterSelect = TRUE
+        ),
+        width = "100%"
+      )
+    )
+  } else {
+    # Use checkbox group for few values
+    tagList(
+      div(
+        style = "margin-bottom: 10px;",
+        div(
+          style = "display: flex; gap: 10px;",
+          actionButton(
+            inputId = ns("select_all"),
+            label = "Select All",
+            class = "btn-sm"
+          ),
+          actionButton(
+            inputId = ns("deselect_all"),
+            label = "Clear",
+            class = "btn-sm"
+          )
+        )
+      ),
+      checkboxGroupInput(
+        inputId = ns("filter_value"),
+        label = NULL,
+        choices = column_info$values,
+        selected = initial_value,
+        width = "100%"
+      )
+    )
+  }
 }
+
 
 #' Create date range input
 #' @noRd
@@ -186,7 +301,7 @@ create_date_input <- function(ns, column_info, initial_value) {
 get_default_value <- function(column_info) {
   switch(column_info$type,
          "numeric" = c(column_info$values$min, column_info$values$max),
-         "categorical" = column_info$values,
+         "categorical" = if(length(column_info$values) <= 8) column_info$values else character(0),
          "date" = c(column_info$values$min, column_info$values$max),
          stop(paste("Unsupported filter type:", column_info$type))
   )
