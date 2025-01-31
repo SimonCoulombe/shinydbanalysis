@@ -2,52 +2,40 @@
 #' 
 #' @description Launches a Shiny app for interactive database analysis with filtering, grouping, and summarization capabilities.
 #'
-#' @param pool A database connection pool object (optional). If not provided, 
-#'            the app will create a new SQLite connection.
-#' @param dbname Path to SQLite database file (ignored if pool is provided).
-#'            Defaults to an in-memory database.
-#' @param column_info_dir Directory to store/generate column information files.
+#' @param pool A database connection pool object
+#' @param column_info_dir Directory containing column information files.
 #'            Defaults to temporary directory.
-#' @param example_data Whether to load example iris and mtcars data into the database.
-#'            Defaults to TRUE.
-#' 
-#' @importFrom shiny shinyApp
-#' @importFrom pool dbPool poolClose
-#' @importFrom DBI dbWriteTable dbListTables
 #' @export
 #' 
 #' @examples
 #' \dontrun{
-#' # Launch with default settings (in-memory database)
-#' shinydbanalysis::run_app()
-#'
-#' # Use persistent database
-#' shinydbanalysis::run_app(dbname = "my_data.db")
+#' # Create a connection pool
+#' pool <- dbPool(drv = RSQLite::SQLite(), dbname = ":memory:")
+#' 
+#' # Write some data
+#' dbWriteTable(pool, "iris", iris)
+#' create_column_info("iris", pool, output_dir = "column_info")
+#' 
+#' # Launch the app
+#' run_app(pool, "column_info")
 #' }
-
-run_app <- function(pool = NULL, 
-                    dbname = ":memory:",
-                    column_info_dir = tempdir(),
-                    example_data = TRUE) {
-  
-  # Create connection pool if not provided
-  if (is.null(pool)) {
-    pool <- pool::dbPool(
-      drv = RSQLite::SQLite(),
-      dbname = dbname
-    )
-    
-    # Close pool on app stop
-    shiny::onStop(function() {
-      if (DBI::dbIsValid(pool)) {
-        message("Closing database connection pool")
-        poolClose(pool)
-      }
-    })
+run_app <- function(pool, column_info_dir = tempdir()) {
+  # Validate inputs
+  if (!inherits(pool, "Pool")) {
+    stop("pool must be a valid database connection pool")
   }
   
-  # Initialize application
-  initialize_app(pool, column_info_dir, example_data)
+  if (!dir.exists(column_info_dir)) {
+    stop("column_info_dir does not exist: ", column_info_dir)
+  }
+  
+  # Close pool when app stops
+  shiny::onStop(function() {
+    if (DBI::dbIsValid(pool)) {
+      message("Closing database connection pool")
+      poolClose(pool)
+    }
+  })
   
   # UI definition
   ui <- shiny::fluidPage(
@@ -70,7 +58,7 @@ run_app <- function(pool = NULL,
         shiny::h3("Debug Information:"),
         shiny::verbatimTextOutput("debug_output"),
         shiny::hr(),
-        shiny::h3("Fetched Data :"),
+        shiny::h3("Fetched Data:"),
         shiny::h3("Query:"),
         shiny::verbatimTextOutput("executed_query"),
         shiny::hr(),
@@ -80,21 +68,8 @@ run_app <- function(pool = NULL,
   )
   
   server <- function(input, output, session) {
-    # Debug observer for all inputs
-    observe({
-      message("=== Input Debug ===")
-      message("All inputs: ", paste(names(input), collapse=", "))
-    })
-    
     # Initialize table picker
     table_info <- table_picker_server("table", column_info_dir)
-    
-    # Debug observer for table selection
-    observe({
-      message("=== Table Info Debug ===")
-      message("Selected table: ", table_info$selected_table())
-      message("Column info available: ", !is.null(table_info$column_info()))
-    })
     
     # Initialize other modules with table_info
     filter_results <- filter_builder_server(
@@ -115,15 +90,7 @@ run_app <- function(pool = NULL,
       column_info = table_info$column_info
     )
     
-    # Debug observer for module outputs
-    observe({
-      message("=== Module Outputs Debug ===")
-      message("Filter WHERE clause: ", filter_results$where_clause())
-      message("Group variables: ", paste(group_results$group_vars(), collapse=", "))
-      message("Summary specs count: ", length(summary_results$summary_specs()))
-    })
-    
-    # Initialize data fetcher with explicit namespacing
+    # Initialize data fetcher
     fetched_data <- data_fetcher_server(
       "fetcher",
       pool = pool,
@@ -132,14 +99,6 @@ run_app <- function(pool = NULL,
       group_builder = group_results,
       summary_builder = summary_results
     )
-    
-    # Debug observer for fetch button
-    observe({
-      # Get the fetch button input with correct namespace
-      fetch_button <- input[["fetcher-fetch_data"]]
-      message("=== Fetch Button Debug ===")
-      message("Fetch button value: ", fetch_button)
-    })
     
     # Debug output panel
     output$debug_output <- renderPrint({
@@ -156,14 +115,6 @@ run_app <- function(pool = NULL,
       } else {
         cat(" No summary specifications\n")
       }
-      
-      fetch_button <- input[["fetcher-fetch_data"]]
-      cat("\nFetch button pressed:", !is.null(fetch_button) && fetch_button > 0, "\n")
-      
-      error <- fetched_data$error()
-      if (!is.null(error)) {
-        cat("\nError:", error, "\n")
-      }
     })
     
     # Show executed query
@@ -171,7 +122,6 @@ run_app <- function(pool = NULL,
       req(fetched_data$executed_query())
       cat(fetched_data$executed_query())
     })
-    
     
     # Results display
     output$results <- renderTable({
@@ -187,43 +137,6 @@ run_app <- function(pool = NULL,
     })
   }
   
-  
   # Run application
   shiny::shinyApp(ui = ui, server = server)
-}
-
-#' Initialize application resources
-#' @keywords internal
-#' @noRd
-initialize_app <- function(pool, column_info_dir, example_data) {
-  message("Initializing application...")
-  
-  # Create example tables if requested
-  if (example_data) {
-    tables <- c("iris", "mtcars")
-    for (table in tables) {
-      if (!table %in% dbListTables(pool)) {
-        message("Creating example table: ", table)
-        dbWriteTable(pool, table, getExportedValue("datasets", table))
-      }
-    }
-  }
-  
-  # Create column info directory if needed
-  if (!dir.exists(column_info_dir)) {
-    message("Creating column info directory: ", column_info_dir)
-    dir.create(column_info_dir, recursive = TRUE)
-  }
-  
-  # Generate column info for all tables
-  tables <- dbListTables(pool)
-  message("Generating column information for tables: ", paste(tables, collapse = ", "))
-  
-  for (table in tables) {
-    col_info_file <- file.path(column_info_dir, paste0("column_info_", table, ".rds"))
-    if (!file.exists(col_info_file)) {
-      message("Generating column info for: ", table)
-      create_column_info(table, pool, output_dir = column_info_dir)
-    }
-  }
 }
