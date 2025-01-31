@@ -230,7 +230,7 @@ library(duckdb)
 library(pool)
 library(ggplot2)  # for the diamonds dataset
 
-gapdata <- gapminder::gapminder %>% filter(country %in% unique(gapminder::gapminder$country)[1:8]) %>% mutate(date = as.Date(paste0(year, "-01-01"))) %>% filter(year >= 1990)
+gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01"))) %>% filter(year >= 1990)
 
 
 # Create a DuckDB connection pool (in-memory database)
