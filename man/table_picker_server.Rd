@@ -12,7 +12,7 @@ table_picker_server(id, column_info_dir)
 \item{column_info_dir}{Path to directory containing column info files}
 }
 \value{
-Reactive expression containing selected table and column info
+List of reactive expressions
 }
 \description{
 Create table picker server

@@ -1,13 +1,64 @@
 #' Create data fetcher UI components
 #'
+
 #' @param id Character. The module ID
 #' @param style Character. Either "collapsible" or "hover" for the preview display style
 #' @return A Shiny UI element
 #' @export
 data_fetcher_ui <- function(id, style = "collapsible") {
   ns <- NS(id)
-
-  if (style == "collapsible") {
+  
+  if (style == "hover") {
+    tagList(
+      tags$head(
+        tags$style(sprintf(
+          "#%s { position: relative; }
+           .hover-preview {
+             visibility: hidden;
+             position: absolute;
+             z-index: 100;
+             background: white;
+             border: 1px solid #ddd;
+             padding: 10px;
+             border-radius: 4px;
+             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+             max-width: 800px;
+             margin-top: 5px;
+             font-family: monospace;
+             font-size: 0.9em;
+             opacity: 0;
+             transition: visibility 0s, opacity 0.2s linear;
+           }
+           .preview-trigger:hover + .hover-preview,
+           .hover-preview:hover {
+             visibility: visible;
+             opacity: 1;
+           }",
+          ns("")
+        ))
+      ),
+      div(
+        id = ns("container"),
+        div(
+          class = "preview-trigger",
+          actionButton(
+            ns("fetch_data"),
+            "Fetch Data",
+            class = "btn-primary"
+          ),
+          span(
+            "Hover to preview SQL",
+            style = "margin-left: 8px; color: #666; font-size: 0.8em;"
+          )
+        ),
+        div(
+          class = "hover-preview",
+          verbatimTextOutput(ns("query_preview"))
+        )
+      )
+    )
+  } else {
+    # Default collapsible version
     tagList(
       div(
         style = "margin-bottom: 10px;",
@@ -26,69 +77,28 @@ data_fetcher_ui <- function(id, style = "collapsible") {
         ),
         div(
           id = ns("preview_container"),
-          style = "display: none; margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-left: 3px solid #dee2e6; font-family: monospace; font-size: 0.9em;",
+          style = "visibility: hidden; height: 0; margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-left: 3px solid #dee2e6; font-family: monospace; font-size: 0.9em;",
           verbatimTextOutput(ns("query_preview"))
         )
       ),
       tags$script(sprintf(
         "$(document).on('click', '#%s', function() {
-          $('#%s').toggle();
+          var container = $('#%s');
+          if (container.css('visibility') === 'hidden') {
+            container.css({'visibility': 'visible', 'height': 'auto'});
+          } else {
+            container.css({'visibility': 'hidden', 'height': '0'});
+          }
         });",
         ns("toggle_preview"),
         ns("preview_container")
       ))
     )
-  } else if (style == "hover") {
-    # Modified hover version
-    tagList(
-      tags$head(
-        tags$style(sprintf(
-          "#%s { position: relative; }
-           .hover-preview {
-             display: none;
-             position: absolute;
-             z-index: 100;
-             background: white;
-             border: 1px solid #ddd;
-             padding: 10px;
-             border-radius: 4px;
-             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-             max-width: 800px;
-             margin-top: 5px;
-             font-family: monospace;
-             font-size: 0.9em;
-           }
-           .preview-trigger:hover + .hover-preview,
-           .hover-preview:hover {
-             display: block;
-           }",
-          ns("")
-        ))
-      ),
-      div(
-        id = ns("container"),
-        div(
-          class = "preview-trigger",
-          actionButton(
-            ns("fetch_data"),
-            "Fetch Data",
-            class = "btn-primary"
-          ),
-          span(
-            "Hover to preview SQL query",
-            style = "margin-left: 8px; color: #666; font-size: 0.8em;"
-          )
-        ),
-        div(
-          class = "hover-preview",
-          verbatimTextOutput(ns("query_preview"))
-        )
-      )
-    )
   }
 }
 
-#' Create data fetcher server
+
+#' Create data fetcher server logic
 #'
 #' @param id Character. The module ID
 #' @param pool Database connection pool
@@ -96,7 +106,7 @@ data_fetcher_ui <- function(id, style = "collapsible") {
 #' @param filter_builder Filter builder module instance
 #' @param group_builder Group builder module instance
 #' @param summary_builder Summary builder module instance
-#' @return List of reactive expressions containing fetched data and error state
+#' @return List of reactive expressions for data, error state, and query information
 #' @export
 data_fetcher_server <- function(id, pool, table_info, filter_builder, group_builder, summary_builder) {
   moduleServer(id, function(input, output, session) {
@@ -104,148 +114,155 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
     error_state <- reactiveVal(NULL)
     fetched_data <- reactiveVal(NULL)
     executed_query <- reactiveVal("")
-    preview_visible <- reactiveVal(FALSE)
-
-    # Toggle preview visibility and update link text
-    observeEvent(input$toggle_preview, {
-      preview_visible(!preview_visible())
-      # Update the link text
-      updateActionLink(session, "toggle_preview",
-                       label = if (preview_visible()) "Hide SQL Preview" else "Show SQL Preview"
-      )
-    })
-
-    # Build preview query using dbplyr
+    
+    # Build query using dbplyr - this is reactive and updates as conditions change
     preview_query <- reactive({
-      req(table_info$selected_table())
-
+      # Ensure this reactive depends on table selection
+      table <- table_info$selected_table()
+      
+      if (is.null(table) || !nzchar(table)) {
+        return(NULL)
+      }
+      
       tryCatch({
-        message("Building dbplyr query...")
-
-        # Start with the table
-        table_name <- table_info$selected_table()
-        query <- tbl(pool, table_name)
-
+        # Get base table reference (handles schemas properly)
+        query <- table_info$create_table_ref()
+        
         # Apply filters if any
         where_clause <- filter_builder$where_clause()
-        if (!is.null(where_clause) && where_clause != "") {
-          filter_expr <- convert_sql_to_filter(where_clause)
-          message("Filter expression: ", filter_expr)
-          query <- filter(query, !!parse_expr(filter_expr))
+        if (!is.null(where_clause) && nzchar(where_clause)) {
+          filter_expr <- parse_filter_expression(where_clause)
+          query <- filter(query, !!filter_expr)
         }
-
+        
         # Get grouping variables
         group_vars <- group_builder$group_vars()
-
+        
         # Get summary specifications
         summary_specs <- summary_builder$summary_specs()
-
-        # Only apply grouping and summarizing if both are specified
+        
+        # Apply grouping and summarization if specified
         if (length(group_vars) > 0 && length(summary_specs) > 0) {
           # Add grouping
           query <- group_by(query, !!!syms(group_vars))
-
-          # Build summarise expressions
-          summary_exprs <- list()
-
-          for (spec in summary_specs) {
-            if (spec$func == "count") {
-              summary_exprs$record_count <- rlang::quo(n())
-            } else {
-              expr <- call(spec$func, sym(spec$metric))
-              summary_exprs[[paste0(spec$func, "_", spec$metric)]] <- rlang::quo(!!expr)
-            }
-          }
-
+          
+          # Build and apply summary expressions
+          summary_exprs <- build_summary_expressions(summary_specs)
           if (length(summary_exprs) > 0) {
             query <- summarise(query, !!!summary_exprs)
           }
         }
-
-        message("Query built successfully")
+        
         query
-
+        
       }, error = function(e) {
-        message("Error building query: ", e$message)
         error_state(paste("Error building query:", e$message))
         NULL
       })
     })
-
+    
+    # Create a reactive for the preview text that updates whenever preview_query changes
+    preview_text <- reactive({
+      query <- preview_query()
+      get_sql_text(query)
+    })
+    
+    # Show preview query - updates reactively as conditions change
+    output$query_preview <- renderPrint({
+      cat(preview_text())
+    })
+    
     # Execute query when fetch button is clicked
     observeEvent(input$fetch_data, {
       query <- preview_query()
-
+      
       if (is.null(query)) {
         fetched_data(NULL)
         executed_query("")
         return()
       }
-
+      
       tryCatch({
-        message("Executing query...")
-        sql <- paste(capture.output(dplyr::show_query(query)), collapse = "\n")
-        executed_query(sql)
-
+        # Store the SQL that's about to be executed
+        executed_query(get_sql_text(query))
+        
+        # Execute query with progress indicator
         withProgress(
           message = 'Fetching data...',
           {
-            incProgress(0.3, detail = "Executing query")
             result <- collect(query)
-            message("Query executed successfully, returned ", nrow(result), " rows")
             fetched_data(result)
             error_state(NULL)
           }
         )
+        
       }, error = function(e) {
-        message("Error executing query: ", e$message)
         error_state(paste("Error executing query:", e$message))
         fetched_data(NULL)
         executed_query("")
       })
     })
-
-    # Preview query - updates reactively
-    output$query_preview <- renderPrint({
-      query <- preview_query()
-
-      if (is.null(query)) {
-        if (is.null(table_info$selected_table()) || table_info$selected_table() == "") {
-          cat("Please select a table")
-        } else {
-          cat("Error building query")
-        }
-      } else {
-        sql <- capture.output(dplyr::show_query(query))
-        cat(paste(sql, collapse = "\n"))
-      }
-    })
-
-    # Ensure the query preview updates even when hidden
-    outputOptions(output, "query_preview", suspendWhenHidden = FALSE)
-
+    
     # Return interface
     list(
-      data = reactive({ fetched_data() }),
-      error = reactive({ error_state() }),
-      executed_query = reactive({ executed_query() }),
-      preview_query = reactive({
-        query <- preview_query()
-        if (!is.null(query)) {
-          paste(capture.output(dplyr::show_query(query)), collapse = "\n")
-        } else {
-          ""
-        }
-      })
+      data = reactive(fetched_data()),
+      error = reactive(error_state()),
+      executed_query = reactive(executed_query()),
+      preview_query = reactive(preview_text())
     )
   })
 }
 
-#' Convert SQL WHERE clause to dplyr filter expression
+# Helper Functions ----
+
+
+#' Convert dbplyr query to SQL text
+#' @param query dbplyr query object
+#' @return Character string containing the SQL query or status message
 #' @noRd
-convert_sql_to_filter <- function(where_clause) {
-  if (is.null(where_clause) || where_clause == "") {
-    return(NULL)
+get_sql_text <- function(query) {
+  if (is.null(query)) {
+    "Select a table to preview query"
+  } else {
+    tryCatch({
+      paste(capture.output(dplyr::show_query(query)), collapse = "\n")
+    }, error = function(e) {
+      paste("Error generating SQL:", e$message)
+    })
   }
-  where_clause
+}
+
+#' Parse filter expression from WHERE clause
+#' @param where_clause Character string containing the filter conditions
+#' @return Parsed expression for dplyr filter
+#' @noRd
+parse_filter_expression <- function(where_clause) {
+  # Convert SQL-like syntax to R expression
+  expr <- where_clause %>%
+    # Keep %in% as is (it's already R syntax)
+    gsub(" AND ", " & ", ., fixed = TRUE) %>%
+    gsub(" OR ", " | ", ., fixed = TRUE)
+  
+  rlang::parse_expr(expr)
+}
+
+#' Build summary expressions for dplyr summarise
+#' @param summary_specs List of summary specifications
+#' @return List of quoted expressions for summarise
+#' @noRd
+build_summary_expressions <- function(summary_specs) {
+  summary_exprs <- list()
+  
+  for (spec in summary_specs) {
+    if (spec$func == "count") {
+      summary_exprs$record_count <- quo(n())
+    } else {
+      # Build expression like mean(price), sum(quantity), etc.
+      expr <- call(spec$func, sym(spec$metric))
+      name <- paste0(spec$func, "_", spec$metric)
+      summary_exprs[[name]] <- quo(!!expr)
+    }
+  }
+  
+  summary_exprs
 }

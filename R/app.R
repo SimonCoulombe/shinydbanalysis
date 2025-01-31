@@ -1,77 +1,110 @@
-#' @title Run the Shiny Database Analysis Application
-#' 
-#' @description Launches a Shiny app for interactive database analysis with filtering, grouping, and summarization capabilities.
+#' Run the Shiny Database Analysis Application
 #'
 #' @param pool A database connection pool object
-#' @param column_info_dir Directory containing column information files.
-#'            Defaults to temporary directory.
+#' @param column_info_dir Directory containing column information files
 #' @export
-#' 
-#' @examples
-#' \dontrun{
-#' # Create a connection pool
-#' pool <- dbPool(drv = RSQLite::SQLite(), dbname = ":memory:")
-#' 
-#' # Write some data
-#' dbWriteTable(pool, "iris", iris)
-#' create_column_info("iris", pool, output_dir = "column_info")
-#' 
-#' # Launch the app
-#' run_app(pool, "column_info")
-#' }
 run_app <- function(pool, column_info_dir = tempdir()) {
-  # Validate inputs
-  if (!inherits(pool, "Pool")) {
-    stop("pool must be a valid database connection pool")
-  }
-  
-  if (!dir.exists(column_info_dir)) {
-    stop("column_info_dir does not exist: ", column_info_dir)
-  }
-  
-  # Close pool when app stops
-  shiny::onStop(function() {
-    if (DBI::dbIsValid(pool)) {
-      message("Closing database connection pool")
-      poolClose(pool)
-    }
-  })
-  
-  # UI definition
-  ui <- shiny::fluidPage(
-    shiny::titlePanel("Dataset Analysis Tool"),
+  ui <- fluidPage(
+    titlePanel("Dataset Analysis Tool"),
     
-    shiny::sidebarLayout(
-      shiny::sidebarPanel(
+    sidebarLayout(
+      sidebarPanel(
         table_picker_ui("table", column_info_dir),
-        shiny::hr(),
+        hr(),
         filter_builder_ui("filters"),
-        shiny::hr(),
+        hr(),
         group_builder_ui("groups"),
-        shiny::hr(),
+        hr(),
         summary_builder_ui("summaries"),
-        shiny::hr(),
+        hr(),
+        # Revert to original hover implementation
         data_fetcher_ui("fetcher", style = "hover")
       ),
       
-      shiny::mainPanel(
-        shiny::h3("Debug Information:"),
-        shiny::verbatimTextOutput("debug_output"),
-        shiny::hr(),
-        shiny::h3("Fetched Data:"),
-        shiny::h3("Query:"),
-        shiny::verbatimTextOutput("executed_query"),
-        shiny::hr(),
-        shiny::tableOutput("results")
+      mainPanel(
+        tabsetPanel(
+          tabPanel("Data",
+                   # Show executed query and any errors above results
+                   div(
+                     style = "margin: 15px 0;",
+                     h4("Executed Query:", class = "text-muted"),
+                     verbatimTextOutput("executed_query"),
+                     # Add error display
+                     uiOutput("error_display"),
+                     hr()
+                   ),
+                   tableOutput("results")
+          ),
+          tabPanel("Debug Information",
+                   div(class = "debug-panel",
+                       # table_picker_server returns selected_table(), column_info()
+                       div(class = "debug-section",
+                           h4("table_picker_server returns:"),
+                           tags$pre(
+                             "selected_table():",
+                             textOutput("table_selected_table", inline = TRUE),
+                             "\n\ncolumn_info():",
+                             verbatimTextOutput("table_column_info")
+                           )
+                       ),
+                       
+                       # filter_builder_server returns where_clause()
+                       div(class = "debug-section",
+                           h4("filter_builder_server returns:"),
+                           tags$pre(
+                             "where_clause():",
+                             textOutput("filter_where_clause", inline = TRUE)
+                           )
+                       ),
+                       
+                       # group_builder_server returns group_vars()
+                       div(class = "debug-section",
+                           h4("group_builder_server returns:"),
+                           tags$pre(
+                             "group_vars():",
+                             textOutput("group_vars", inline = TRUE)
+                           )
+                       ),
+                       
+                       # summary_builder_server returns summary_specs()
+                       div(class = "debug-section",
+                           h4("summary_builder_server returns:"),
+                           tags$pre(
+                             "summary_specs():",
+                             verbatimTextOutput("summary_specs")
+                           )
+                       ),
+                       
+                       # data_fetcher_server returns data(), error(), executed_query()
+                       div(class = "debug-section",
+                           h4("data_fetcher_server returns:"),
+                           tags$pre(
+                             "error():",
+                             textOutput("fetcher_error", inline = TRUE),
+                             "\n\nexecuted_query():",
+                             verbatimTextOutput("fetcher_executed_query"),
+                             "\n\ndata():",
+                             verbatimTextOutput("fetcher_data_str")
+                           )
+                       )
+                   )
+          )
+        )
       )
     )
   )
   
   server <- function(input, output, session) {
-    # Initialize table picker
+    # Clean up pool when app stops
+    onStop(function() {
+      if (DBI::dbIsValid(pool)) {
+        poolClose(pool)
+      }
+    })
+    
+    # Initialize modules
     table_info <- table_picker_server("table", column_info_dir)
     
-    # Initialize other modules with table_info
     filter_results <- filter_builder_server(
       "filters",
       selected_table = table_info$selected_table,
@@ -90,7 +123,6 @@ run_app <- function(pool, column_info_dir = tempdir()) {
       column_info = table_info$column_info
     )
     
-    # Initialize data fetcher
     fetched_data <- data_fetcher_server(
       "fetcher",
       pool = pool,
@@ -100,30 +132,63 @@ run_app <- function(pool, column_info_dir = tempdir()) {
       summary_builder = summary_results
     )
     
-    # Debug output panel
-    output$debug_output <- renderPrint({
-      cat("=== Debug Information ===\n")
-      cat("Selected table:", table_info$selected_table(), "\n")
-      cat("WHERE clause:", filter_results$where_clause(), "\n")
-      cat("Group vars:", paste(group_results$group_vars(), collapse=", "), "\n")
-      cat("Summary specs:\n")
-      specs <- summary_results$summary_specs()
-      if (length(specs) > 0) {
-        for (spec in specs) {
-          cat(" -", spec$func, "of", spec$metric, "\n")
-        }
-      } else {
-        cat(" No summary specifications\n")
+    # Error display
+    output$error_display <- renderUI({
+      error <- fetched_data$error()
+      if (!is.null(error)) {
+        div(
+          class = "alert alert-danger",
+          error
+        )
       }
     })
     
-    # Show executed query
+    # Show executed query above results
     output$executed_query <- renderPrint({
       req(fetched_data$executed_query())
       cat(fetched_data$executed_query())
     })
     
-    # Results display
+    # Debug outputs with exact names from server modules
+    
+    # table_picker_server debug
+    output$table_selected_table <- renderText({
+      table_info$selected_table() %||% "NULL"
+    })
+    
+    output$table_column_info <- renderPrint({
+      str(table_info$column_info())
+    })
+    
+    # filter_builder_server debug
+    output$filter_where_clause <- renderText({
+      filter_results$where_clause() %||% "NULL"
+    })
+    
+    # group_builder_server debug
+    output$group_vars <- renderText({
+      paste(group_results$group_vars(), collapse = ", ") %||% "NULL"
+    })
+    
+    # summary_builder_server debug
+    output$summary_specs <- renderPrint({
+      str(summary_results$summary_specs())
+    })
+    
+    # data_fetcher_server debug
+    output$fetcher_error <- renderText({
+      fetched_data$error() %||% "NULL"
+    })
+    
+    output$fetcher_executed_query <- renderPrint({
+      cat(fetched_data$executed_query() %||% "NULL")
+    })
+    
+    output$fetcher_data_str <- renderPrint({
+      str(fetched_data$data())
+    })
+    
+    # Results table
     output$results <- renderTable({
       error <- fetched_data$error()
       if (!is.null(error)) {
@@ -131,12 +196,11 @@ run_app <- function(pool, column_info_dir = tempdir()) {
       }
       data <- fetched_data$data()
       if (is.null(data)) {
-        return(data.frame(Message = "No data fetched yet"))
+        return(data.frame(Message = "Click 'Fetch Data' to load data"))
       }
       head(data, 10)
     })
   }
   
-  # Run application
-  shiny::shinyApp(ui = ui, server = server)
+  shinyApp(ui = ui, server = server)
 }

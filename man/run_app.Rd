@@ -9,22 +9,8 @@ run_app(pool, column_info_dir = tempdir())
 \arguments{
 \item{pool}{A database connection pool object}
 
-\item{column_info_dir}{Directory containing column information files.
-Defaults to temporary directory.}
+\item{column_info_dir}{Directory containing column information files}
 }
 \description{
-Launches a Shiny app for interactive database analysis with filtering, grouping, and summarization capabilities.
-}
-\examples{
-\dontrun{
-# Create a connection pool
-pool <- dbPool(drv = RSQLite::SQLite(), dbname = ":memory:")
-
-# Write some data
-dbWriteTable(pool, "iris", iris)
-create_column_info("iris", pool, output_dir = "column_info")
-
-# Launch the app
-run_app(pool, "column_info")
-}
+Run the Shiny Database Analysis Application
 }
