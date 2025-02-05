@@ -47,15 +47,24 @@ filter_builder_server <- function(id, storage_info, selected_table) {
     
     # Clear filters when table changes
     observeEvent(selected_table(), {
-      # Reset all state
-      state$modules <- list()
+      # Immediately clear where clause to prevent invalid queries
       state$filter_states <- list()
       
-      # Remove all filter UI elements
+      # Remove all filter UI elements first
       removeUI(selector = paste0("#", ns("filters"), " > *"))
+      
+      # Then reset module state
+      state$modules <- list()
+      
+      # Reset the add filter dropdown
+      updateSelectInput(
+        session,
+        "add_filter",
+        choices = c("Select column" = "")
+      )
     }, ignoreInit = TRUE)
     
-    # Update available columns
+    # Update available columns (separate observer to prevent race conditions)
     observe({
       req(selected_table(), column_info())
       col_info <- column_info()
