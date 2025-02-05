@@ -154,10 +154,12 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       table_picker_ui("table"),
+      hr(),
       filter_builder_ui("filters"),
-      group_builder_ui("groups"),
+      hr(),
       summary_builder_ui("summaries"),
-      data_fetcher_ui("fetcher")
+      hr(),
+      data_fetcher_ui("fetcher", style = "hover")
     ),
     
     mainPanel(
@@ -187,12 +189,6 @@ server <- function(input, output, session) {
     selected_table = table_info$selected_table
   )
   
-  group_results <- group_builder_server(
-    "groups",
-    selected_table = table_info$selected_table,
-    column_info = current_column_info
-  )
-  
   summary_results <- summary_builder_server(
     "summaries",
     selected_table = table_info$selected_table,
@@ -205,7 +201,6 @@ server <- function(input, output, session) {
     pool = pool,
     table_info = table_info,
     filter_builder = filter_results,
-    group_builder = group_results,
     summary_builder = summary_results
   )
   
@@ -282,9 +277,6 @@ run_app(
   storage_type = "local",
   local_dir = "column_info"
 )
-
-# Don't forget to close the pool when done
-# poolClose(pool)
 ```
 
 ## Debug Panel in the default app
