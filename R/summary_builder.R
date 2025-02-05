@@ -5,7 +5,7 @@
 #' @export
 summary_builder_ui <- function(id) {
   ns <- NS(id)
-
+  
   list(
     shiny::checkboxInput(
       ns("include_count"),
@@ -37,16 +37,22 @@ summary_builder_ui <- function(id) {
 #'
 #' @param id Character. The module ID
 #' @param selected_table Reactive. Selected table from table_picker
-#' @param column_info Reactive. Column info from table_picker
+#' @param column_info Reactive. Column info list containing metadata and distinct values
 #' @return List of reactive expressions containing summary specifications
 #' @export
 summary_builder_server <- function(id, selected_table, column_info) {
   moduleServer(id, function(input, output, session) {
-
+    
     # Update available metrics (numeric columns only) when table changes
     observe({
       req(selected_table(), column_info())
-      numeric_cols <- names(which(sapply(column_info(), function(x) x$type == "numeric")))
+      col_info <- column_info()
+      
+      # Get numeric columns from metadata
+      numeric_cols <- col_info$metadata %>%
+        filter(column_type == "numeric") %>%
+        pull(column_name)
+      
       updateSelectizeInput(
         session,
         "metrics",
@@ -54,11 +60,11 @@ summary_builder_server <- function(id, selected_table, column_info) {
         selected = character(0)
       )
     })
-
+    
     # Build summary specifications
     summary_specs <- reactive({
       specs <- list()
-
+      
       # Always add count if selected
       if (input$include_count) {
         specs[[length(specs) + 1]] <- list(
@@ -67,7 +73,7 @@ summary_builder_server <- function(id, selected_table, column_info) {
           sql = "n"  # Use dplyr's n() function
         )
       }
-
+      
       # Add metric-function combinations if any metrics selected
       if (length(input$metrics) > 0 && length(input$functions) > 0) {
         for (metric in input$metrics) {
@@ -80,10 +86,10 @@ summary_builder_server <- function(id, selected_table, column_info) {
           }
         }
       }
-
+      
       specs
     })
-
+    
     # Return interface
     list(
       summary_specs = summary_specs

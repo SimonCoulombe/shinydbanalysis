@@ -7,5 +7,6 @@
 #' @importFrom tidyr drop_na
 #' @importFrom dbplyr sql
 #' @importFrom rlang parse_expr sym syms %||% quo
+#' @importFrom AzureStor storage_endpoint storage_container 
 #' @import shiny
 NULL

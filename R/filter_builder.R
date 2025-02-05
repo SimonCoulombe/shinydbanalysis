@@ -1,5 +1,4 @@
 #' Create filter builder UI components
-#'
 #' @param id Character. The module ID
 #' @return A list of Shiny UI elements
 #' @export
@@ -16,14 +15,13 @@ filter_builder_ui <- function(id) {
   )
 }
 
-#' Create filter builder server
-#'
+#' Create filter builder server logic
 #' @param id Character. The module ID
-#' @param selected_table Reactive. Selected table from table_picker
-#' @param column_info Reactive. Column info from table_picker
+#' @param storage_info List with storage configuration
+#' @param selected_table Reactive. Selected table name
 #' @return List of reactive expressions
 #' @export
-filter_builder_server <- function(id, selected_table, column_info) {
+filter_builder_server <- function(id, storage_info, selected_table) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
@@ -32,6 +30,20 @@ filter_builder_server <- function(id, selected_table, column_info) {
       modules = list(),
       filter_states = list()
     )
+    
+    # Reactive for loading column info
+    column_info <- reactive({
+      req(selected_table())
+      
+      read_column_info(
+        tablename = selected_table(),
+        storage_type = storage_info$storage_type,
+        local_dir = storage_info$local_dir,
+        adls_endpoint = storage_info$adls_endpoint,
+        adls_container = storage_info$adls_container,
+        sas_token = storage_info$sas_token
+      )
+    })
     
     # Clear filters when table changes
     observeEvent(selected_table(), {
@@ -48,8 +60,14 @@ filter_builder_server <- function(id, selected_table, column_info) {
       req(selected_table(), column_info())
       col_info <- column_info()
       
+      # Get active columns (those already with filters)
       active_columns <- sapply(state$modules, function(mod) mod$instance$column)
-      available_columns <- setdiff(names(col_info), active_columns)
+      
+      # Get all available columns from metadata
+      all_columns <- col_info$metadata$column_name
+      
+      # Get columns without filters
+      available_columns <- setdiff(all_columns, active_columns)
       
       updateSelectInput(
         session,
@@ -62,7 +80,12 @@ filter_builder_server <- function(id, selected_table, column_info) {
     observeEvent(input$add_filter, {
       req(input$add_filter != "")
       col_info <- column_info()
-      add_new_filter(input$add_filter, state, col_info, session)
+      
+      # Get metadata for selected column
+      col_metadata <- col_info$metadata %>%
+        filter(column_name == input$add_filter)
+      
+      add_new_filter(input$add_filter, state, col_metadata, col_info$distinct_values, session)
       updateSelectInput(session, "add_filter", selected = "")
     })
     
@@ -96,9 +119,11 @@ filter_builder_server <- function(id, selected_table, column_info) {
     
     # Build WHERE clause reactively
     where_clause <- reactive({
+      req(column_info())
+      
       where_clauses <- build_where_clauses(state$modules)
       if (length(where_clauses) > 0) {
-        paste(where_clauses, collapse = " & ")  # Note: changed AND to &
+        paste(where_clauses, collapse = " & ")  # Using & for SQL AND
       } else {
         ""
       }
@@ -106,15 +131,27 @@ filter_builder_server <- function(id, selected_table, column_info) {
     
     # Render UI elements
     output$filters <- renderUI({
-      req(selected_table())
+      req(selected_table(), column_info())
       mods <- state$modules
       states <- state$filter_states
       col_info <- column_info()
       
       filter_list <- lapply(names(mods), function(id) {
-        col_name <- mods[[id]]$instance$column
         full_id <- ns(id)
-        filter_module_ui(full_id, col_info[[col_name]], states[[id]])
+        col_name <- mods[[id]]$instance$column
+        
+        # Get metadata for this column
+        col_metadata <- col_info$metadata %>%
+          filter(column_name == col_name)
+        
+        filter_module_ui(
+          full_id, 
+          list(
+            metadata = col_metadata,
+            distinct_values = col_info$distinct_values
+          ),
+          states[[id]]
+        )
       })
       
       do.call(tagList, filter_list)
@@ -128,34 +165,18 @@ filter_builder_server <- function(id, selected_table, column_info) {
   })
 }
 
-
 # Helper Functions ----
-
-#' Load column information from file
-#' @noRd
-load_column_info <- function(table_name) {
-  col_info_path <- file.path(
-    "column_info",
-    paste0("column_info_", table_name, ".rds")
-  )
-  
-  validate(need(
-    file.exists(col_info_path),
-    sprintf("Column info file not found: %s", col_info_path)
-  ))
-  
-  readRDS(col_info_path)
-}
 
 #' Add a new filter to the state
 #' @noRd
-add_new_filter <- function(column_name, state, col_info, session) {
+add_new_filter <- function(column_name, state, metadata, distinct_values, session) {
   current_id <- generate_filter_id(column_name)
   
   if (!column_exists_in_modules(column_name, state$modules)) {
     filter_instance <- filter_module_server(
       current_id,
-      col_info[[column_name]],
+      metadata,
+      distinct_values,
       state$filter_states[[current_id]]
     )
     
@@ -189,10 +210,10 @@ build_where_clauses <- function(modules) {
   if (length(modules) == 0) return(character(0))
   
   filters <- lapply(modules, function(mod) {
-    switch(mod$instance$type,
-           "numeric" = build_numeric_clause(mod),
-           "categorical" = build_categorical_clause(mod),
-           "date" = build_date_clause(mod)
+    build_filter_expression(
+      mod$instance$column,
+      mod$instance$type,
+      mod$instance$value()
     )
   })
   
@@ -201,46 +222,4 @@ build_where_clauses <- function(modules) {
   
   if (length(filters) == 0) return(character(0))
   filters
-}
-
-#' Build numeric WHERE clause
-#' @noRd
-build_numeric_clause <- function(mod) {
-  value <- mod$instance$value()
-  if (is.null(value) || length(value) != 2) return(NULL)
-  
-  column <- mod$instance$column
-  sprintf(
-    "%s >= %f & %s <= %f",
-    column, value[1],
-    column, value[2]
-  )
-}
-
-#' Build categorical WHERE clause
-#' @noRd
-build_categorical_clause <- function(mod) {
-  values <- mod$instance$value()
-  if (is.null(values) || length(values) == 0) return(NULL)
-  
-  values_str <- paste(
-    sprintf("'%s'", values),
-    collapse = ", "
-  )
-  sprintf("%s %%in%% c(%s)", mod$instance$column, values_str)
-}
-
-#' Build date WHERE clause
-#' @noRd
-build_date_clause <- function(mod) {
-  value <- mod$instance$value()
-  if (is.null(value) || length(value) != 2) return(NULL)
-  
-  column <- mod$instance$column
-  # Use as.character to convert dates to standard string format for comparison
-  sprintf(
-    "%s >= as.Date('%s') & %s <= as.Date('%s')",
-    column, as.character(value[1]),
-    column, as.character(value[2])
-  )
 }

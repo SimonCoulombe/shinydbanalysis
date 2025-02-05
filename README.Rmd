@@ -43,11 +43,13 @@ devtools::install_github("SimonCoulombe/shinydbanalysis")
 ```{r, eval= FALSE}
 
 library(shinydbanalysis)
-library(duckdb)
+library(duckdb) # for local database example
 library(pool)
 library(ggplot2)  # for the diamonds dataset
 library(gapminder) # for gapminder dataset 
-
+library(arrow) # we save as parquet files  
+library(dplyr) 
+library(AzureStor) # we can save column info to ADLS directly instead of local hardrive for deployment on servers
 
 gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01"))) %>% filter(year >= 1990)
 # Create a DuckDB connection pool (in-memory database)
@@ -63,12 +65,32 @@ dbWriteTable(pool, SQL("gapdata"), gapdata)
 
 
 # Generate column information for each table
-create_column_info("diamonds", pool, "column_info")
-create_column_info("iris", pool, "column_info")
-create_column_info("gapdata", pool, "column_info")
+create_column_info("diamonds", pool)
+create_column_info("iris", pool)
+create_column_info("gapdata", pool)
+
+metadata_df <- read_column_info(
+    tablename = "diamonds",
+    storage_type = "local",
+    local_dir = "column_info"
+  )
 
 # Launch the app-
-run_app(pool, "column_info")
+# Local storage
+run_app(
+  pool = pool,
+  storage_type = "local",
+  local_dir = "column_info"
+)
+
+# ADLS storage
+#run_app(
+#   pool = pool,
+#   storage_type = "adls",
+#   adls_endpoint = "https://myaccount.dfs.core.windows.net",
+#   adls_container = "mycontainer",
+#   sas_token = "mysastoken"
+# )
 
 ```
 
@@ -99,7 +121,23 @@ pool <- dbPool(
 # Set up data
 dir.create("column_info", showWarnings = FALSE)
 dbWriteTable(pool, "diamonds", ggplot2::diamonds)
-create_column_info("diamonds", pool, "column_info")
+
+# Create column info with new format
+create_column_info(
+  tablename = "diamonds",
+  pool = pool,
+  storage_type = "local",
+  local_dir = "column_info"
+)
+
+# Create storage info configuration
+storage_info <- list(
+  storage_type = "local",
+  local_dir = "column_info",
+  adls_endpoint = NULL,
+  adls_container = NULL,
+  sas_token = NULL
+)
 
 # Create a Shiny app
 ui <- fluidPage(
@@ -107,7 +145,7 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      table_picker_ui("table", "column_info"),
+      table_picker_ui("table"),
       filter_builder_ui("filters"),
       group_builder_ui("groups"),
       summary_builder_ui("summaries"),
@@ -122,26 +160,35 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-
-  # Initialize modules
-  table_info <- table_picker_server("table", pool,  "column_info")
+  # Initialize modules with new storage configuration
+  table_info <- table_picker_server("table", pool, storage_info)
+  
+  # Get current column info reactively
+  current_column_info <- reactive({
+    req(table_info$selected_table())
+    read_column_info(
+      tablename = table_info$selected_table(),
+      storage_type = storage_info$storage_type,
+      local_dir = storage_info$local_dir
+    )
+  })
   
   filter_results <- filter_builder_server(
     "filters",
-    selected_table = table_info$selected_table,
-    column_info = table_info$column_info
+    storage_info = storage_info,
+    selected_table = table_info$selected_table
   )
   
   group_results <- group_builder_server(
     "groups",
     selected_table = table_info$selected_table,
-    column_info = table_info$column_info
+    column_info = current_column_info
   )
   
   summary_results <- summary_builder_server(
     "summaries",
     selected_table = table_info$selected_table,
-    column_info = table_info$column_info
+    column_info = current_column_info
   )
   
   # Initialize data fetcher
@@ -200,20 +247,36 @@ The package works with any database supported by dbplyr. Here are some connectio
 **WARNING: SQLITE DOESNT PLAY NICE WITH DATES**
 ```{r, eval= FALSE}
 library(RSQLite)
+
+# Create database connection pool
 pool <- dbPool(
   drv = SQLite(),
   dbname = "my_database.sqlite"
 )
 
-
-# Load some example datasets
+# Load example dataset
 dbWriteTable(pool, "mtcars", mtcars, overwrite = TRUE)
 
-# Generate column information for each table. 
-create_column_info("mtcars", pool, "column_info")
+# Create directory for metadata
+dir.create("column_info", showWarnings = FALSE)
 
-# Launch the app
-run_app(pool, "column_info")
+# Generate column information with new format
+create_column_info(
+  tablename = "mtcars",
+  pool = pool,
+  storage_type = "local",
+  local_dir = "column_info"
+)
+
+# Launch the app with explicit storage configuration
+run_app(
+  pool = pool,
+  storage_type = "local",
+  local_dir = "column_info"
+)
+
+# Don't forget to close the pool when done
+# poolClose(pool)
 
 ```
 

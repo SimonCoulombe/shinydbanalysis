@@ -1,30 +1,4 @@
 
-
-
-
-#' Get list of available tables with column info files
-#'
-#' @param column_info_dir Path to directory containing column info files
-#' @param pool Database connection pool
-#' @return Named character vector of available tables
-#' @noRd
-get_available_tables <- function(column_info_dir, pool) {
-  # Get tables with column info files
-  col_info_files <- list.files(column_info_dir, pattern = "^column_info_.*\\.rds$")
-  table_names <- gsub("^column_info_(.+)\\.rds$", "\\1", col_info_files)
-  # Convert underscore back to dot for display
-  #table_names <- gsub("_", ".", table_names, fixed = TRUE)
-  
-  # Verify tables exist
-  existing_tables <- sapply(table_names, function(name) {
-    table_info <- parse_table_name(name)
-    table_exists(pool, table_info)
-  })
-  
-  available_tables <- table_names[existing_tables]
-  stats::setNames(available_tables, available_tables)
-}
-
 #' Parse schema and table name
 #'
 #' @param full_table_name Character string that might contain schema (e.g., "schema.table")
@@ -54,13 +28,47 @@ create_table_ref <- function(pool, table_info) {
   }
 }
 
+
+#' Get list of available tables with column info files
+#' @param storage_info List containing storage configuration
+#' @param pool Database connection pool
+#' @return Named character vector of available tables
+#' @noRd
+get_available_tables <- function(storage_info, pool) {
+  if (storage_info$storage_type == "local") {
+    # Get tables with column info files from local storage
+    col_info_files <- list.files(storage_info$local_dir, 
+                                 pattern = "^column_info_.*\\.parquet$")
+    table_names <- gsub("^column_info_(.+)\\.parquet$", "\\1", col_info_files)
+  } else {
+    # Get tables with column info files from ADLS
+    endpoint <- AzureStor::storage_endpoint(storage_info$adls_endpoint, 
+                                 sas = storage_info$sas_token)
+    container <- AzureStor::storage_container(endpoint, storage_info$adls_container)
+    
+    # List files in container
+    files <- AzureStor::azure_files(container)
+    
+    # Filter for column info files
+    col_info_files <- files$name[grepl("^column_info_.*\\.parquet$", files$name)]
+    table_names <- gsub("^column_info_(.+)\\.parquet$", "\\1", col_info_files)
+  }
+  
+  # Verify tables exist in database
+  existing_tables <- sapply(table_names, function(name) {
+    table_info <- parse_table_name(name)
+    table_exists(pool, table_info)
+  })
+  
+  available_tables <- table_names[existing_tables]
+  stats::setNames(available_tables, available_tables)
+}
+
 #' Create table picker UI components
-#'
 #' @param id Character. The module ID
-#' @param column_info_dir Path to directory containing column info files
 #' @return A Shiny UI element
 #' @export
-table_picker_ui <- function(id, column_info_dir) {
+table_picker_ui <- function(id) {
   ns <- NS(id)
   
   selectInput(
@@ -71,17 +79,17 @@ table_picker_ui <- function(id, column_info_dir) {
 }
 
 #' Create table picker server
-#'
 #' @param id Character. The module ID
-#' @param column_info_dir Path to directory containing column info files
+#' @param pool Pool object. Database connection pool
+#' @param storage_info List containing storage configuration
 #' @return List of reactive expressions
 #' @export
-table_picker_server <- function(id, pool, column_info_dir) {
+table_picker_server <- function(id, pool, storage_info) {
   moduleServer(id, function(input, output, session) {
     
     # Update available tables
     observe({
-      available_tables <- try(get_available_tables(column_info_dir, pool))
+      available_tables <- try(get_available_tables(storage_info, pool))
       
       if (inherits(available_tables, "try-error")) {
         warning("Error getting available tables: ", available_tables)
@@ -96,7 +104,7 @@ table_picker_server <- function(id, pool, column_info_dir) {
       )
     })
     
-    # Parse selected table name and get column info
+    # Parse selected table name
     table_info <- reactive({
       req(input$table_select)
       validate(need(
@@ -104,31 +112,7 @@ table_picker_server <- function(id, pool, column_info_dir) {
         "Please select a valid table"
       ))
       
-      # Parse table name for potential schema
       parse_table_name(input$table_select)
-    })
-    
-    # Get column information
-    column_info <- reactive({
-      req(table_info())
-      
-      # We use the full table name (including schema if present) for the file
-      col_info_path <- file.path(
-        column_info_dir,
-        paste0("column_info_", input$table_select, ".rds")
-      )
-      
-      validate(need(
-        file.exists(col_info_path),
-        sprintf("Column info file not found: %s", col_info_path)
-      ))
-      
-      # Debug log
-      message("Loading column info for table: ", input$table_select)
-      info <- readRDS(col_info_path)
-      message("Loaded columns: ", paste(names(info), collapse=", "))
-      
-      info
     })
     
     # Return interface
@@ -137,9 +121,8 @@ table_picker_server <- function(id, pool, column_info_dir) {
         req(table_info())
         input$table_select
       }),
-      table_info = table_info,  # New: return parsed table info
-      column_info = column_info,
-      create_table_ref = reactive({  # New: return function to create table reference
+      table_info = table_info,
+      create_table_ref = reactive({
         req(table_info())
         create_table_ref(pool, table_info())
       })

@@ -4,12 +4,14 @@
 \alias{table_picker_server}
 \title{Create table picker server}
 \usage{
-table_picker_server(id, pool, column_info_dir)
+table_picker_server(id, pool, storage_info)
 }
 \arguments{
 \item{id}{Character. The module ID}
 
-\item{column_info_dir}{Path to directory containing column info files}
+\item{pool}{Pool object. Database connection pool}
+
+\item{storage_info}{List containing storage configuration}
 }
 \value{
 List of reactive expressions

@@ -2,20 +2,20 @@
 % Please edit documentation in R/filter_builder.R
 \name{filter_builder_server}
 \alias{filter_builder_server}
-\title{Create filter builder server}
+\title{Create filter builder server logic}
 \usage{
-filter_builder_server(id, selected_table, column_info)
+filter_builder_server(id, storage_info, selected_table)
 }
 \arguments{
 \item{id}{Character. The module ID}
 
-\item{selected_table}{Reactive. Selected table from table_picker}
+\item{storage_info}{List with storage configuration}
 
-\item{column_info}{Reactive. Column info from table_picker}
+\item{selected_table}{Reactive. Selected table name}
 }
 \value{
 List of reactive expressions
 }
 \description{
-Create filter builder server
+Create filter builder server logic
 }
