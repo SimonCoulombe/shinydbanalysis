@@ -12,7 +12,8 @@
 
 # Generated files
 column_info/*.rds
-
+column_info/*.parquet
+column_info/
 # System files
 .DS_Store
 Thumbs.db
