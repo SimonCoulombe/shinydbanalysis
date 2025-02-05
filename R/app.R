@@ -41,8 +41,6 @@ run_app <- function(pool,
         hr(),
         filter_builder_ui("filters"),
         hr(),
-        group_builder_ui("groups"),
-        hr(),
         summary_builder_ui("summaries"),
         hr(),
         data_fetcher_ui("fetcher", style = "hover")
@@ -79,18 +77,14 @@ run_app <- function(pool,
                        ),
                        
                        div(class = "debug-section",
-                           h4("group_builder_server returns:"),
-                           tags$pre(
-                             "group_vars():",
-                             textOutput("group_vars", inline = TRUE)
-                           )
-                       ),
-                       
-                       div(class = "debug-section",
                            h4("summary_builder_server returns:"),
                            tags$pre(
                              "summary_specs():",
-                             verbatimTextOutput("summary_specs")
+                             verbatimTextOutput("summary_specs"),
+                             "group_vars():",
+                             textOutput("summary_group_vars", inline = TRUE),
+                             "needs_summary():",
+                             textOutput("summary_needs_summary", inline = TRUE)
                            )
                        ),
                        
@@ -122,7 +116,7 @@ run_app <- function(pool,
       selected_table = table_info$selected_table
     )
     
-    # Get current column info reactively for group builder
+    # Get current column info reactively for summary builder
     current_column_info <- reactive({
       req(table_info$selected_table())
       read_column_info(
@@ -135,12 +129,6 @@ run_app <- function(pool,
       )
     })
     
-    group_results <- group_builder_server(
-      "groups",
-      selected_table = table_info$selected_table,
-      column_info = current_column_info
-    )
-    
     summary_results <- summary_builder_server(
       "summaries",
       selected_table = table_info$selected_table,
@@ -152,7 +140,6 @@ run_app <- function(pool,
       pool = pool,
       table_info = table_info,
       filter_builder = filter_results,
-      group_builder = group_results,
       summary_builder = summary_results
     )
     
@@ -182,12 +169,16 @@ run_app <- function(pool,
       filter_results$where_clause() %||% "NULL"
     })
     
-    output$group_vars <- renderText({
-      paste(group_results$group_vars(), collapse = ", ") %||% "NULL"
-    })
-    
     output$summary_specs <- renderPrint({
       str(summary_results$summary_specs())
+    })
+    
+    output$summary_group_vars <- renderText({
+      paste(summary_results$group_vars(), collapse = ", ") %||% "NULL"
+    })
+    
+    output$summary_needs_summary <- renderText({
+      summary_results$needs_summary()
     })
     
     output$fetcher_error <- renderText({
@@ -216,7 +207,7 @@ run_app <- function(pool,
       
       # Define custom formatters for different column types
       DT::datatable(
-        head(data, 10),
+        data,  # Removed head() to show all rows
         options = list(
           pageLength = 10,
           scrollX = TRUE

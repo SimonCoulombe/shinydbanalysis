@@ -4,40 +4,17 @@
 #' @param style Character. Either "collapsible" or "hover" for the preview display style
 #' @return A Shiny UI element
 #' @export
-data_fetcher_ui <- function(id, style = "collapsible") {
+data_fetcher_ui <- function(id, style = "hover") {
   ns <- NS(id)
   
   if (style == "hover") {
     tagList(
-      tags$head(
-        tags$style(sprintf(
-          "#%s { position: relative; }
-           .hover-preview {
-             visibility: hidden;
-             position: absolute;
-             z-index: 100;
-             background: white;
-             border: 1px solid #ddd;
-             padding: 10px;
-             border-radius: 4px;
-             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-             max-width: 800px;
-             margin-top: 5px;
-             font-family: monospace;
-             font-size: 0.9em;
-             opacity: 0;
-             transition: visibility 0s, opacity 0.2s linear;
-           }
-           .preview-trigger:hover + .hover-preview,
-           .hover-preview:hover {
-             visibility: visible;
-             opacity: 1;
-           }",
-          ns("")
-        ))
-      ),
       div(
         id = ns("container"),
+        # Warning message
+        uiOutput(ns("warning_message")),
+        
+        # Button and SQL preview
         div(
           class = "preview-trigger",
           actionButton(
@@ -52,8 +29,35 @@ data_fetcher_ui <- function(id, style = "collapsible") {
         ),
         div(
           class = "hover-preview",
+          style = "margin-top: 10px;",
           verbatimTextOutput(ns("query_preview"))
         )
+      ),
+      tags$head(
+        tags$style(sprintf(
+          "#%s { position: relative; }
+           .hover-preview {
+             visibility: hidden;
+             position: absolute;
+             z-index: 100;
+             background: white;
+             border: 1px solid #ddd;
+             padding: 10px;
+             border-radius: 4px;
+             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+             max-width: 800px;
+             font-family: monospace;
+             font-size: 0.9em;
+             opacity: 0;
+             transition: visibility 0s, opacity 0.2s linear;
+           }
+           .preview-trigger:hover + .hover-preview,
+           .hover-preview:hover {
+             visibility: visible;
+             opacity: 1;
+           }",
+          ns("")
+        ))
       )
     )
   } else {
@@ -61,6 +65,7 @@ data_fetcher_ui <- function(id, style = "collapsible") {
     tagList(
       div(
         style = "margin-bottom: 10px;",
+        uiOutput(ns("warning_message")),
         actionButton(
           ns("fetch_data"),
           "Fetch Data",
@@ -79,19 +84,7 @@ data_fetcher_ui <- function(id, style = "collapsible") {
           style = "visibility: hidden; height: 0; margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-left: 3px solid #dee2e6; font-family: monospace; font-size: 0.9em;",
           verbatimTextOutput(ns("query_preview"))
         )
-      ),
-      tags$script(sprintf(
-        "$(document).on('click', '#%s', function() {
-          var container = $('#%s');
-          if (container.css('visibility') === 'hidden') {
-            container.css({'visibility': 'visible', 'height': 'auto'});
-          } else {
-            container.css({'visibility': 'hidden', 'height': '0'});
-          }
-        });",
-        ns("toggle_preview"),
-        ns("preview_container")
-      ))
+      )
     )
   }
 }
@@ -102,20 +95,36 @@ data_fetcher_ui <- function(id, style = "collapsible") {
 #' @param pool Database connection pool
 #' @param table_info Table picker module instance
 #' @param filter_builder Filter builder module instance
-#' @param group_builder Group builder module instance
 #' @param summary_builder Summary builder module instance
 #' @return List of reactive expressions
 #' @export
-data_fetcher_server <- function(id, pool, table_info, filter_builder, group_builder, summary_builder) {
+data_fetcher_server <- function(id, pool, table_info, filter_builder, summary_builder) {
   moduleServer(id, function(input, output, session) {
     # State management
     error_state <- reactiveVal(NULL)
     fetched_data <- reactiveVal(NULL)
     executed_query <- reactiveVal("")
     
-    # Build query using dbplyr - this is reactive and updates as conditions change
+    # Warning message output
+    output$warning_message <- renderUI({
+      req(table_info$selected_table())
+      
+      # Only show warning if we're not summarizing
+      if (!summary_builder$needs_summary()) {
+        div(
+          class = "alert alert-warning",
+          style = "margin-bottom: 10px;",
+          icon("exclamation-triangle"),
+          tags$b("Warning: "),
+          "Fetching all data without summarization may take a while.",
+          tags$br(),
+          "Consider using summary statistics if you don't need individual records."
+        )
+      }
+    })
+    
+    # Build query using dbplyr
     preview_query <- reactive({
-      # Ensure this reactive depends on table selection
       table <- table_info$selected_table()
       
       if (is.null(table) || !nzchar(table)) {
@@ -123,7 +132,7 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
       }
       
       tryCatch({
-        # Get base table reference (handles schemas properly)
+        # Get base table reference
         query <- table_info$create_table_ref()
         
         # Apply filters if any
@@ -133,18 +142,16 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
           query <- filter(query, !!filter_expr)
         }
         
-        # Get grouping variables
-        group_vars <- group_builder$group_vars()
-        
-        # Apply grouping and summarization if specified
-        if (length(group_vars) > 0) {
-          # Add grouping
-          query <- group_by(query, !!!syms(group_vars))
+        # Only apply summarization if specifically requested
+        if (summary_builder$needs_summary()) {
+          # Get grouping variables if any
+          group_vars <- summary_builder$group_vars()
+          if (length(group_vars) > 0) {
+            query <- group_by(query, !!!syms(group_vars))
+          }
           
-          # Get summary specifications
+          # Apply summary specifications
           summary_specs <- summary_builder$summary_specs()
-          
-          # Build and apply summary expressions
           if (length(summary_specs) > 0) {
             summary_exprs <- build_summary_expressions(summary_specs)
             if (length(summary_exprs) > 0) {
@@ -161,13 +168,13 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
       })
     })
     
-    # Create a reactive for the preview text that updates whenever preview_query changes
+    # Create preview text
     preview_text <- reactive({
       query <- preview_query()
       get_sql_text(query)
     })
     
-    # Show preview query - updates reactively as conditions change
+    # Show preview query
     output$query_preview <- renderPrint({
       cat(preview_text())
     })
@@ -212,6 +219,7 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, group_buil
     )
   })
 }
+
 
 # Helper Functions ----
 

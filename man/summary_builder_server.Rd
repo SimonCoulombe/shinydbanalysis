@@ -14,7 +14,7 @@ summary_builder_server(id, selected_table, column_info)
 \item{column_info}{Reactive. Column info list containing metadata and distinct values}
 }
 \value{
-List of reactive expressions containing summary specifications
+List of reactive expressions containing summary specifications and grouping variables
 }
 \description{
 Create summary builder server

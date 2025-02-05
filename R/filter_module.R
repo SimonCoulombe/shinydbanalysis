@@ -44,8 +44,6 @@ create_numeric_input <- function(ns, metadata, initial_value) {
 
 #' Create date range input
 #' @noRd
-#' Create date range input
-#' @noRd
 create_date_input <- function(ns, metadata, initial_value) {
   if (is.null(initial_value)) {
     initial_value <- c(as.Date(metadata$min_date), 

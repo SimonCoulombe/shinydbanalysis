@@ -4,7 +4,7 @@
 \alias{data_fetcher_ui}
 \title{Create data fetcher UI components}
 \usage{
-data_fetcher_ui(id, style = "collapsible")
+data_fetcher_ui(id, style = "hover")
 }
 \arguments{
 \item{id}{Character. The module ID}
