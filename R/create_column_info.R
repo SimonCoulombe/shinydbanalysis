@@ -20,6 +20,7 @@ get_storage_location <- function(storage_type, local_dir, adls_endpoint, adls_co
 }
 
 #' Create column info with flexible storage
+#'
 #' @param tablename Character. Name of the table to analyze
 #' @param pool Pool object. Database connection pool
 #' @param storage_type Either "local" or "adls"
@@ -28,6 +29,7 @@ get_storage_location <- function(storage_type, local_dir, adls_endpoint, adls_co
 #' @param adls_container ADLS container name
 #' @param sas_token ADLS SAS token
 #' @param max_distinct_values Integer. Maximum number of distinct values to store
+#' @param batch_size Integer. Number of columns to process in each batch
 #' @return List containing metadata_df and distinct_values_df (invisibly)
 #' @export
 create_column_info <- function(tablename, 
@@ -37,7 +39,8 @@ create_column_info <- function(tablename,
                                adls_endpoint = NULL,
                                adls_container = NULL,
                                sas_token = NULL,
-                               max_distinct_values = 300) {
+                               max_distinct_values = 300,
+                               batch_size = 100) {
   
   table_info <- parse_table_name(tablename)
   
@@ -71,37 +74,61 @@ create_column_info <- function(tablename,
     date_cols <- names(column_types)[sapply(column_types, function(x) x[1] %in% c("Date", "POSIXct", "POSIXt"))]
     categorical_cols <- names(column_types)[sapply(column_types, function(x) x[1] %in% c("character", "factor"))]
     
-    # Build a single query using dbplyr for all column statistics
-    message("Computing statistics for all columns...")
-    stats_df <- tbl_ref %>%
-      summarise(
-        across(
-          all_of(c(numeric_cols, date_cols)),
-          list(
-            min = ~min(., na.rm = TRUE),
-            max = ~max(., na.rm = TRUE),
-            n_distinct = ~n_distinct(.)
+    # Process columns in batches
+    process_columns_batch <- function(cols, type) {
+      message(sprintf("Processing %d %s columns...", length(cols), type))
+      
+      # Split columns into batches
+      batches <- split(cols, ceiling(seq_along(cols) / batch_size))
+      
+      # Process each batch
+      batch_results <- lapply(batches, function(batch_cols) {
+        message(sprintf("Processing batch: %s", paste(batch_cols, collapse = ", ")))
+        
+        stats_query <- tbl_ref %>%
+          summarise(
+            across(
+              all_of(batch_cols),
+              list(
+                min = ~min(., na.rm = TRUE),
+                max = ~max(., na.rm = TRUE),
+                n_distinct = ~n_distinct(.)
+              )
+            )
           )
-        ),
-        across(
-          all_of(categorical_cols),
-          list(
-            n_distinct = ~n_distinct(.)
-          )
-        )
-      ) %>%
-      collect()
+        
+        collect(stats_query)
+      })
+      
+      # Combine batch results
+      Reduce(function(x, y) {
+        bind_cols(x, y)
+      }, batch_results)
+    }
     
-    # Create separate data frames for each type with appropriate column types
+    # Process each type of column
+    stats_numeric <- if (length(numeric_cols) > 0) {
+      process_columns_batch(numeric_cols, "numeric")
+    }
+    
+    stats_date <- if (length(date_cols) > 0) {
+      process_columns_batch(date_cols, "date")
+    }
+    
+    stats_categorical <- if (length(categorical_cols) > 0) {
+      process_columns_batch(categorical_cols, "categorical")
+    }
+    
+    # Create metadata dataframes for each type
     numeric_metadata <- if (length(numeric_cols) > 0) {
       data.frame(
         column_name = numeric_cols,
         column_type = "numeric",
-        min_value = sapply(numeric_cols, function(col) stats_df[[paste0(col, "_min")]]),
-        max_value = sapply(numeric_cols, function(col) stats_df[[paste0(col, "_max")]]),
+        min_value = sapply(numeric_cols, function(col) stats_numeric[[paste0(col, "_min")]]),
+        max_value = sapply(numeric_cols, function(col) stats_numeric[[paste0(col, "_max")]]),
         min_date = as.Date(NA),
         max_date = as.Date(NA),
-        n_distinct = sapply(numeric_cols, function(col) as.integer(stats_df[[paste0(col, "_n_distinct")]])),
+        n_distinct = sapply(numeric_cols, function(col) as.integer(stats_numeric[[paste0(col, "_n_distinct")]])),
         created_at = Sys.time(),
         stringsAsFactors = FALSE
       )
@@ -113,9 +140,9 @@ create_column_info <- function(tablename,
         column_type = "date",
         min_value = NA_real_,
         max_value = NA_real_,
-        min_date = as.Date(sapply(date_cols, function(col) stats_df[[paste0(col, "_min")]])),
-        max_date = as.Date(sapply(date_cols, function(col) stats_df[[paste0(col, "_max")]])),
-        n_distinct = sapply(date_cols, function(col) as.integer(stats_df[[paste0(col, "_n_distinct")]])),
+        min_date = as.Date(sapply(date_cols, function(col) stats_date[[paste0(col, "_min")]])),
+        max_date = as.Date(sapply(date_cols, function(col) stats_date[[paste0(col, "_max")]])),
+        n_distinct = sapply(date_cols, function(col) as.integer(stats_date[[paste0(col, "_n_distinct")]])),
         created_at = Sys.time(),
         stringsAsFactors = FALSE
       )
@@ -129,7 +156,7 @@ create_column_info <- function(tablename,
         max_value = NA_real_,
         min_date = as.Date(NA),
         max_date = as.Date(NA),
-        n_distinct = sapply(categorical_cols, function(col) as.integer(stats_df[[paste0(col, "_n_distinct")]])),
+        n_distinct = sapply(categorical_cols, function(col) as.integer(stats_categorical[[paste0(col, "_n_distinct")]])),
         created_at = Sys.time(),
         stringsAsFactors = FALSE
       )
@@ -138,7 +165,7 @@ create_column_info <- function(tablename,
     # Combine all metadata
     metadata_df <- do.call(rbind, list(numeric_metadata, date_metadata, categorical_metadata))
     
-    # Process distinct values for categorical columns
+    # Process distinct values for categorical columns in batches
     distinct_values_list <- list()
     
     for (col in categorical_cols) {
