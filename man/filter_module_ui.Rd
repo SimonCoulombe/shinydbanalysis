@@ -2,22 +2,20 @@
 % Please edit documentation in R/filter_module.R
 \name{filter_module_ui}
 \alias{filter_module_ui}
-\title{Individual Filter Module with Improved Layout and Date Support
-Create filter module UI}
+\title{Create filter module UI components}
 \usage{
 filter_module_ui(id, column_info, initial_value = NULL)
 }
 \arguments{
 \item{id}{Character. The module ID}
 
-\item{column_info}{List. Column information containing name, type, and possible values}
+\item{column_info}{List of metadata and distinct values dataframes}
 
 \item{initial_value}{Vector. Initial filter value(s)}
 }
 \value{
-A Shiny UI element
+Shiny UI element
 }
 \description{
-Individual Filter Module with Improved Layout and Date Support
-Create filter module UI
+Create filter module UI components
 }

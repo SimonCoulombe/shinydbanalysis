@@ -11,7 +11,7 @@ summary_builder_server(id, selected_table, column_info)
 
 \item{selected_table}{Reactive. Selected table from table_picker}
 
-\item{column_info}{Reactive. Column info from table_picker}
+\item{column_info}{Reactive. Column info list containing metadata and distinct values}
 }
 \value{
 List of reactive expressions containing summary specifications

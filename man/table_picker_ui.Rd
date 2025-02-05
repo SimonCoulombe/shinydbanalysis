@@ -4,12 +4,10 @@
 \alias{table_picker_ui}
 \title{Create table picker UI components}
 \usage{
-table_picker_ui(id, column_info_dir)
+table_picker_ui(id)
 }
 \arguments{
 \item{id}{Character. The module ID}
-
-\item{column_info_dir}{Path to directory containing column info files}
 }
 \value{
 A Shiny UI element

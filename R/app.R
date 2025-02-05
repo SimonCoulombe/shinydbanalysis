@@ -1,15 +1,43 @@
 #' Run the Shiny Database Analysis Application
 #'
 #' @param pool A database connection pool object
-#' @param column_info_dir Directory containing column information files
+#' @param storage_type Either "local" or "adls"
+#' @param local_dir Path for local storage (default: "column_info")
+#' @param adls_endpoint ADLS endpoint URL (required if storage_type = "adls")
+#' @param adls_container ADLS container name (required if storage_type = "adls")
+#' @param sas_token ADLS SAS token (required if storage_type = "adls")
 #' @export
-run_app <- function(pool, column_info_dir = tempdir()) {
+run_app <- function(pool,
+                    storage_type = "local",
+                    local_dir = "column_info",
+                    adls_endpoint = NULL,
+                    adls_container = NULL,
+                    sas_token = NULL) {
+  
+  # Validate storage configuration
+  storage_type <- match.arg(storage_type, c("local", "adls"))
+  
+  if (storage_type == "adls") {
+    if (is.null(adls_endpoint) || is.null(adls_container) || is.null(sas_token)) {
+      stop("ADLS endpoint, container, and SAS token are required when storage_type is 'adls'")
+    }
+  }
+  
+  # Create storage info list
+  storage_info <- list(
+    storage_type = storage_type,
+    local_dir = local_dir,
+    adls_endpoint = adls_endpoint,
+    adls_container = adls_container,
+    sas_token = sas_token
+  )
+  
   ui <- fluidPage(
     titlePanel("Dataset Analysis Tool"),
     
     sidebarLayout(
       sidebarPanel(
-        table_picker_ui("table", column_info_dir),
+        table_picker_ui("table"),
         hr(),
         filter_builder_ui("filters"),
         hr(),
@@ -17,19 +45,16 @@ run_app <- function(pool, column_info_dir = tempdir()) {
         hr(),
         summary_builder_ui("summaries"),
         hr(),
-        # Revert to original hover implementation
         data_fetcher_ui("fetcher", style = "hover")
       ),
       
       mainPanel(
         tabsetPanel(
           tabPanel("Data",
-                   # Show executed query and any errors above results
                    div(
                      style = "margin: 15px 0;",
                      h4("Executed Query:", class = "text-muted"),
                      verbatimTextOutput("executed_query"),
-                     # Add error display
                      uiOutput("error_display"),
                      hr()
                    ),
@@ -37,18 +62,14 @@ run_app <- function(pool, column_info_dir = tempdir()) {
           ),
           tabPanel("Debug Information",
                    div(class = "debug-panel",
-                       # table_picker_server returns selected_table(), column_info()
                        div(class = "debug-section",
                            h4("table_picker_server returns:"),
                            tags$pre(
                              "selected_table():",
-                             textOutput("table_selected_table", inline = TRUE),
-                             "\n\ncolumn_info():",
-                             verbatimTextOutput("table_column_info")
+                             textOutput("table_selected_table", inline = TRUE)
                            )
                        ),
                        
-                       # filter_builder_server returns where_clause()
                        div(class = "debug-section",
                            h4("filter_builder_server returns:"),
                            tags$pre(
@@ -57,7 +78,6 @@ run_app <- function(pool, column_info_dir = tempdir()) {
                            )
                        ),
                        
-                       # group_builder_server returns group_vars()
                        div(class = "debug-section",
                            h4("group_builder_server returns:"),
                            tags$pre(
@@ -66,7 +86,6 @@ run_app <- function(pool, column_info_dir = tempdir()) {
                            )
                        ),
                        
-                       # summary_builder_server returns summary_specs()
                        div(class = "debug-section",
                            h4("summary_builder_server returns:"),
                            tags$pre(
@@ -75,7 +94,6 @@ run_app <- function(pool, column_info_dir = tempdir()) {
                            )
                        ),
                        
-                       # data_fetcher_server returns data(), error(), executed_query()
                        div(class = "debug-section",
                            h4("data_fetcher_server returns:"),
                            tags$pre(
@@ -95,26 +113,38 @@ run_app <- function(pool, column_info_dir = tempdir()) {
   )
   
   server <- function(input, output, session) {
-
     # Initialize modules
-    table_info <- table_picker_server("table", pool, column_info_dir)
+    table_info <- table_picker_server("table", pool, storage_info)
     
     filter_results <- filter_builder_server(
       "filters",
-      selected_table = table_info$selected_table,
-      column_info = table_info$column_info
+      storage_info = storage_info,
+      selected_table = table_info$selected_table
     )
+    
+    # Get current column info reactively for group builder
+    current_column_info <- reactive({
+      req(table_info$selected_table())
+      read_column_info(
+        tablename = table_info$selected_table(),
+        storage_type = storage_info$storage_type,
+        local_dir = storage_info$local_dir,
+        adls_endpoint = storage_info$adls_endpoint,
+        adls_container = storage_info$adls_container,
+        sas_token = storage_info$sas_token
+      )
+    })
     
     group_results <- group_builder_server(
       "groups",
       selected_table = table_info$selected_table,
-      column_info = table_info$column_info
+      column_info = current_column_info
     )
     
     summary_results <- summary_builder_server(
       "summaries",
       selected_table = table_info$selected_table,
-      column_info = table_info$column_info
+      column_info = current_column_info
     )
     
     fetched_data <- data_fetcher_server(
@@ -143,33 +173,23 @@ run_app <- function(pool, column_info_dir = tempdir()) {
       cat(fetched_data$executed_query())
     })
     
-    # Debug outputs with exact names from server modules
-    
-    # table_picker_server debug
+    # Debug outputs
     output$table_selected_table <- renderText({
       table_info$selected_table() %||% "NULL"
     })
     
-    output$table_column_info <- renderPrint({
-      str(table_info$column_info())
-    })
-    
-    # filter_builder_server debug
     output$filter_where_clause <- renderText({
       filter_results$where_clause() %||% "NULL"
     })
     
-    # group_builder_server debug
     output$group_vars <- renderText({
       paste(group_results$group_vars(), collapse = ", ") %||% "NULL"
     })
     
-    # summary_builder_server debug
     output$summary_specs <- renderPrint({
       str(summary_results$summary_specs())
     })
     
-    # data_fetcher_server debug
     output$fetcher_error <- renderText({
       fetched_data$error() %||% "NULL"
     })

@@ -2,20 +2,22 @@
 % Please edit documentation in R/filter_module.R
 \name{filter_module_server}
 \alias{filter_module_server}
-\title{Create filter module server}
+\title{Create filter module server logic}
 \usage{
-filter_module_server(id, column_info, initial_value = NULL)
+filter_module_server(id, metadata, distinct_values, initial_value = NULL)
 }
 \arguments{
 \item{id}{Character. The module ID}
 
-\item{column_info}{List. Column information}
+\item{metadata}{Metadata for the column}
 
-\item{initial_value}{Vector. Initial filter value(s)}
+\item{distinct_values}{Distinct values for categorical columns}
+
+\item{initial_value}{Initial filter value}
 }
 \value{
-List of reactive expressions
+List of reactive values
 }
 \description{
-Create filter module server
+Create filter module server logic
 }
