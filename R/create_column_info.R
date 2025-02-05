@@ -58,132 +58,126 @@ create_column_info <- function(tablename,
     # Get table reference
     tbl_ref <- create_table_ref(pool, table_info)
     
-    # First pass: Get basic column info
-    message("First pass: Getting basic column info...")
+    # Get column types from a single row
+    message("Getting column types...")
     sample_data <- tbl_ref %>% 
       head(1) %>% 
       collect()
     
     column_types <- lapply(sample_data, class)
     
-    # Initialize metadata
-    metadata_rows <- list()
+    # Separate columns by type
+    numeric_cols <- names(column_types)[sapply(column_types, function(x) x[1] %in% c("numeric", "integer"))]
+    date_cols <- names(column_types)[sapply(column_types, function(x) x[1] %in% c("Date", "POSIXct", "POSIXt"))]
+    categorical_cols <- names(column_types)[sapply(column_types, function(x) x[1] %in% c("character", "factor"))]
+    
+    # Build a single query using dbplyr for all column statistics
+    message("Computing statistics for all columns...")
+    stats_df <- tbl_ref %>%
+      summarise(
+        across(
+          all_of(c(numeric_cols, date_cols)),
+          list(
+            min = ~min(., na.rm = TRUE),
+            max = ~max(., na.rm = TRUE),
+            n_distinct = ~n_distinct(.)
+          )
+        ),
+        across(
+          all_of(categorical_cols),
+          list(
+            n_distinct = ~n_distinct(.)
+          )
+        )
+      ) %>%
+      collect()
+    
+    # Create separate data frames for each type with appropriate column types
+    numeric_metadata <- if (length(numeric_cols) > 0) {
+      data.frame(
+        column_name = numeric_cols,
+        column_type = "numeric",
+        min_value = sapply(numeric_cols, function(col) stats_df[[paste0(col, "_min")]]),
+        max_value = sapply(numeric_cols, function(col) stats_df[[paste0(col, "_max")]]),
+        min_date = as.Date(NA),
+        max_date = as.Date(NA),
+        n_distinct = sapply(numeric_cols, function(col) as.integer(stats_df[[paste0(col, "_n_distinct")]])),
+        created_at = Sys.time(),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    date_metadata <- if (length(date_cols) > 0) {
+      data.frame(
+        column_name = date_cols,
+        column_type = "date",
+        min_value = NA_real_,
+        max_value = NA_real_,
+        min_date = as.Date(sapply(date_cols, function(col) stats_df[[paste0(col, "_min")]])),
+        max_date = as.Date(sapply(date_cols, function(col) stats_df[[paste0(col, "_max")]])),
+        n_distinct = sapply(date_cols, function(col) as.integer(stats_df[[paste0(col, "_n_distinct")]])),
+        created_at = Sys.time(),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    categorical_metadata <- if (length(categorical_cols) > 0) {
+      data.frame(
+        column_name = categorical_cols,
+        column_type = "categorical",
+        min_value = NA_real_,
+        max_value = NA_real_,
+        min_date = as.Date(NA),
+        max_date = as.Date(NA),
+        n_distinct = sapply(categorical_cols, function(col) as.integer(stats_df[[paste0(col, "_n_distinct")]])),
+        created_at = Sys.time(),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    # Combine all metadata
+    metadata_df <- do.call(rbind, list(numeric_metadata, date_metadata, categorical_metadata))
+    
+    # Process distinct values for categorical columns
     distinct_values_list <- list()
     
-    # Process each column
-    for (col in names(column_types)) {
-      message("Processing column: ", col)
-      col_class <- column_types[[col]][1]
+    for (col in categorical_cols) {
+      n_distinct <- metadata_df$n_distinct[metadata_df$column_name == col]
       
-      if (col_class == "Date" || col_class == "POSIXct" || col_class == "POSIXt") {
-        # Date type
-        range_values <- tbl_ref %>%
-          summarise(
-            min = min(.data[[col]], na.rm = TRUE),
-            max = max(.data[[col]], na.rm = TRUE),
-            n_distinct = n_distinct(.data[[col]])
-          ) %>%
-          collect()
+      if (n_distinct <= max_distinct_values) {
+        message("Getting distinct values for: ", col)
+        values <- tbl_ref %>%
+          filter(!is.na(.data[[col]])) %>%
+          select(all_of(col)) %>%
+          distinct() %>%
+          arrange(.data[[col]]) %>%
+          collect() %>%
+          pull(col)
         
-        metadata_rows[[col]] <- data.frame(
-          column_name = col,
-          column_type = "date",
-          min_value = as.character(as.Date(range_values$min)),
-          max_value = as.character(as.Date(range_values$max)),
-          n_distinct = range_values$n_distinct,
-          stringsAsFactors = FALSE
-        )
-        
-      } else if (col_class %in% c("character", "factor")) {
-        # Categorical type
-        n_distinct <- tbl_ref %>%
-          summarise(n = n_distinct(.data[[col]])) %>%
-          pull(n)
-        
-        metadata_rows[[col]] <- data.frame(
-          column_name = col,
-          column_type = "categorical",
-          min_value = NA_character_,
-          max_value = NA_character_,
-          n_distinct = n_distinct,
-          stringsAsFactors = FALSE
-        )
-        
-        # Get distinct values if count is below threshold
-        if (n_distinct <= max_distinct_values) {
-          message("Getting distinct values for: ", col)
-          values <- tbl_ref %>%
-            filter(!is.na(.data[[col]])) %>%
-            select(all_of(col)) %>%
-            distinct() %>%
-            arrange(.data[[col]]) %>%
-            collect() %>%
-            pull(col)
-          
-          if (is.factor(values)) {
-            values <- as.character(values)
-          }
-          
-          distinct_values_list[[col]] <- data.frame(
-            column_name = col,
-            value = values,
-            stringsAsFactors = FALSE
-          )
+        if (is.factor(values)) {
+          values <- as.character(values)
         }
         
-      } else {
-        # Numeric type
-        summary_values <- tbl_ref %>%
-          summarise(
-            min = min(.data[[col]], na.rm = TRUE),
-            max = max(.data[[col]], na.rm = TRUE),
-            n_distinct = n_distinct(.data[[col]])
-          ) %>%
-          collect()
-        
-        metadata_rows[[col]] <- data.frame(
+        distinct_values_list[[col]] <- data.frame(
           column_name = col,
-          column_type = "numeric",
-          min_value = as.character(summary_values$min),
-          max_value = as.character(summary_values$max),
-          n_distinct = summary_values$n_distinct,
+          value = values,
           stringsAsFactors = FALSE
         )
       }
     }
     
-    # Combine metadata rows
-    metadata_df <- bind_rows(metadata_rows)
-    
-    # Add table information
-    metadata_df$table_name <- tablename
-    metadata_df$created_at <- Sys.time()
-    
-    # Reorder columns
-    metadata_df <- metadata_df %>%
-      select(table_name, column_name, column_type, min_value, max_value, 
-             n_distinct, created_at)
-    
     # Combine distinct values
     distinct_values_df <- bind_rows(distinct_values_list)
-    if (nrow(distinct_values_df) > 0) {
-      distinct_values_df$table_name <- tablename
-      distinct_values_df <- distinct_values_df %>%
-        select(table_name, column_name, value)
-    }
     
-    # Get storage location
+    # Storage handling
     storage <- get_storage_location(storage_type, local_dir, adls_endpoint, adls_container, sas_token)
     
-    # Save both tables
     if (storage$type == "local") {
-      # Save metadata
       arrow::write_parquet(
         metadata_df,
         file.path(storage$path, sprintf("column_info_%s.parquet", tablename))
       )
       
-      # Save distinct values if any exist
       if (nrow(distinct_values_df) > 0) {
         arrow::write_parquet(
           distinct_values_df,
@@ -193,15 +187,12 @@ create_column_info <- function(tablename,
       
       message(sprintf("Column info saved to: %s", storage$path))
     } else {
-      # For ADLS
-      # Save metadata
       tmp_file <- tempfile(fileext = ".parquet")
       arrow::write_parquet(metadata_df, tmp_file)
       storage_upload(storage$container, tmp_file, 
                      sprintf("column_info_%s.parquet", tablename))
       unlink(tmp_file)
       
-      # Save distinct values if any exist
       if (nrow(distinct_values_df) > 0) {
         tmp_file <- tempfile(fileext = ".parquet")
         arrow::write_parquet(distinct_values_df, tmp_file)

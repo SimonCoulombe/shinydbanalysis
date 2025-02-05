@@ -44,10 +44,12 @@ create_numeric_input <- function(ns, metadata, initial_value) {
 
 #' Create date range input
 #' @noRd
+#' Create date range input
+#' @noRd
 create_date_input <- function(ns, metadata, initial_value) {
   if (is.null(initial_value)) {
-    initial_value <- c(as.Date(metadata$min_value), 
-                       as.Date(metadata$max_value))
+    initial_value <- c(as.Date(metadata$min_date), 
+                       as.Date(metadata$max_date))
   }
   
   dateRangeInput(
@@ -55,8 +57,8 @@ create_date_input <- function(ns, metadata, initial_value) {
     label = NULL,
     start = initial_value[1],
     end = initial_value[2],
-    min = as.Date(metadata$min_value),
-    max = as.Date(metadata$max_value),
+    min = as.Date(metadata$min_date),
+    max = as.Date(metadata$max_date),
     width = "100%"
   )
 }
@@ -210,8 +212,8 @@ filter_module_server <- function(id, metadata, distinct_values, initial_value = 
       initial_value <- switch(metadata$column_type,
                               "numeric" = c(as.numeric(metadata$min_value), 
                                             as.numeric(metadata$max_value)),
-                              "date" = c(as.Date(metadata$min_value), 
-                                         as.Date(metadata$max_value)),
+                              "date" = c(as.Date(metadata$min_date), 
+                                         as.Date(metadata$max_date)),
                               "categorical" = character(0))
     }
     
