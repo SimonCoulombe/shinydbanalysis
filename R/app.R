@@ -43,7 +43,8 @@ run_app <- function(pool,
         hr(),
         summary_builder_ui("summaries"),
         hr(),
-        data_fetcher_ui("fetcher", style = "hover")
+        data_fetcher_ui("fetcher", style = "hover") 
+        
       ),
       
       mainPanel(
@@ -56,7 +57,10 @@ run_app <- function(pool,
                      uiOutput("error_display"),
                      hr()
                    ),
-                   DT::dataTableOutput("results")
+                   DT::dataTableOutput("results")    
+          ),
+          tabPanel("Visualization",
+                   plot_builder_ui("plot")
           ),
           tabPanel("Debug Information",
                    div(class = "debug-panel",
@@ -142,6 +146,8 @@ run_app <- function(pool,
       filter_builder = filter_results,
       summary_builder = summary_results
     )
+    
+    plot_results <- plot_builder_server("plot", fetched_data)
     
     # Error display
     output$error_display <- renderUI({
