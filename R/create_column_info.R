@@ -74,8 +74,7 @@ create_column_info <- function(tablename,
     date_cols <- names(column_types)[sapply(column_types, function(x) x[1] %in% c("Date", "POSIXct", "POSIXt"))]
     categorical_cols <- names(column_types)[sapply(column_types, function(x) x[1] %in% c("character", "factor"))]
     
-    # Process columns in batches
-    process_columns_batch <- function(cols, type) {
+    process_columns_batch <- function(cols, type, tbl_ref) {
       message(sprintf("Processing %d %s columns...", length(cols), type))
       
       if (length(cols) == 0) return(NULL)
@@ -87,17 +86,36 @@ create_column_info <- function(tablename,
       batch_results <- lapply(batches, function(batch_cols) {
         message(sprintf("Processing batch: %s", paste(batch_cols, collapse = ", ")))
         
-        # Process all columns in the batch at once
+        # Build expressions for each column
+        summary_exprs <- list()
+        
+        for (col in batch_cols) {
+          # Quote column name with double quotes
+          quoted_col <- sprintf('"%s"', col)
+          
+          # Build SQL expressions with proper column quoting
+          min_sql <- dbplyr::sql(sprintf(
+            'MIN(CASE WHEN %s IS NOT NULL THEN %s END)', 
+            quoted_col, quoted_col
+          ))
+          max_sql <- dbplyr::sql(sprintf(
+            'MAX(CASE WHEN %s IS NOT NULL THEN %s END)', 
+            quoted_col, quoted_col
+          ))
+          n_distinct_sql <- dbplyr::sql(sprintf(
+            'COUNT(DISTINCT CASE WHEN %s IS NOT NULL THEN %s END)', 
+            quoted_col, quoted_col
+          ))
+          
+          summary_exprs[[paste0(col, "_min")]] <- quo(!!min_sql)
+          summary_exprs[[paste0(col, "_max")]] <- quo(!!max_sql)
+          summary_exprs[[paste0(col, "_n_distinct")]] <- quo(!!n_distinct_sql)
+        }
+        
+        # Execute the query with all expressions
         stats_query <- tbl_ref %>%
           summarise(
-            across(
-              all_of(batch_cols),
-              list(
-                min = ~min(., na.rm = TRUE),
-                max = ~max(., na.rm = TRUE),
-                n_distinct = ~n_distinct(., na.rm = TRUE)
-              )
-            )
+            !!!summary_exprs
           )
         
         collect(stats_query)
@@ -110,11 +128,10 @@ create_column_info <- function(tablename,
         NULL
       }
     }
-    
     # Process each type of column
-    stats_numeric <- process_columns_batch(numeric_cols, "numeric")
-    stats_date <- process_columns_batch(date_cols, "date")
-    stats_categorical <- process_columns_batch(categorical_cols, "categorical")
+    stats_numeric <- process_columns_batch(numeric_cols, "numeric", tbl_ref)
+    stats_date <- process_columns_batch(date_cols, "date", tbl_ref)
+    stats_categorical <- process_columns_batch(categorical_cols, "categorical", tbl_ref)
     
     # Helper function to safely extract stats
     safe_extract_stat <- function(stats_df, col, stat_suffix, default = NA) {
