@@ -74,9 +74,10 @@ create_column_info <- function(tablename,
     date_cols <- names(column_types)[sapply(column_types, function(x) x[1] %in% c("Date", "POSIXct", "POSIXt"))]
     categorical_cols <- names(column_types)[sapply(column_types, function(x) x[1] %in% c("character", "factor"))]
     
-    # Process columns in batches
-    process_columns_batch <- function(cols, type) {
+    process_columns_batch <- function(cols, type, tbl_ref) {
       message(sprintf("Processing %d %s columns...", length(cols), type))
+      
+      if (length(cols) == 0) return(NULL)
       
       # Split columns into batches
       batches <- split(cols, ceiling(seq_along(cols) / batch_size))
@@ -85,38 +86,58 @@ create_column_info <- function(tablename,
       batch_results <- lapply(batches, function(batch_cols) {
         message(sprintf("Processing batch: %s", paste(batch_cols, collapse = ", ")))
         
+        # Build expressions for each column
+        summary_exprs <- list()
+        
+        for (col in batch_cols) {
+          # Quote column name with double quotes
+          quoted_col <- sprintf('"%s"', col)
+          
+          # Build SQL expressions with proper column quoting
+          min_sql <- dbplyr::sql(sprintf(
+            'MIN(CASE WHEN %s IS NOT NULL THEN %s END)', 
+            quoted_col, quoted_col
+          ))
+          max_sql <- dbplyr::sql(sprintf(
+            'MAX(CASE WHEN %s IS NOT NULL THEN %s END)', 
+            quoted_col, quoted_col
+          ))
+          n_distinct_sql <- dbplyr::sql(sprintf(
+            'COUNT(DISTINCT CASE WHEN %s IS NOT NULL THEN %s END)', 
+            quoted_col, quoted_col
+          ))
+          
+          summary_exprs[[paste0(col, "_min")]] <- quo(!!min_sql)
+          summary_exprs[[paste0(col, "_max")]] <- quo(!!max_sql)
+          summary_exprs[[paste0(col, "_n_distinct")]] <- quo(!!n_distinct_sql)
+        }
+        
+        # Execute the query with all expressions
         stats_query <- tbl_ref %>%
           summarise(
-            across(
-              all_of(batch_cols),
-              list(
-                min = ~min(., na.rm = TRUE),
-                max = ~max(., na.rm = TRUE),
-                n_distinct = ~n_distinct(.)
-              )
-            )
+            !!!summary_exprs
           )
         
         collect(stats_query)
       })
       
       # Combine batch results
-      Reduce(function(x, y) {
-        bind_cols(x, y)
-      }, batch_results)
+      if (length(batch_results) > 0) {
+        Reduce(bind_cols, batch_results)
+      } else {
+        NULL
+      }
     }
-    
     # Process each type of column
-    stats_numeric <- if (length(numeric_cols) > 0) {
-      process_columns_batch(numeric_cols, "numeric")
-    }
+    stats_numeric <- process_columns_batch(numeric_cols, "numeric", tbl_ref)
+    stats_date <- process_columns_batch(date_cols, "date", tbl_ref)
+    stats_categorical <- process_columns_batch(categorical_cols, "categorical", tbl_ref)
     
-    stats_date <- if (length(date_cols) > 0) {
-      process_columns_batch(date_cols, "date")
-    }
-    
-    stats_categorical <- if (length(categorical_cols) > 0) {
-      process_columns_batch(categorical_cols, "categorical")
+    # Helper function to safely extract stats
+    safe_extract_stat <- function(stats_df, col, stat_suffix, default = NA) {
+      if (is.null(stats_df)) return(default)
+      col_name <- paste0(col, "_", stat_suffix)
+      if (col_name %in% names(stats_df)) stats_df[[col_name]] else default
     }
     
     # Create metadata dataframes for each type
@@ -124,11 +145,11 @@ create_column_info <- function(tablename,
       data.frame(
         column_name = numeric_cols,
         column_type = "numeric",
-        min_value = sapply(numeric_cols, function(col) stats_numeric[[paste0(col, "_min")]]),
-        max_value = sapply(numeric_cols, function(col) stats_numeric[[paste0(col, "_max")]]),
+        min_value = sapply(numeric_cols, function(col) safe_extract_stat(stats_numeric, col, "min", NA_real_)),
+        max_value = sapply(numeric_cols, function(col) safe_extract_stat(stats_numeric, col, "max", NA_real_)),
         min_date = as.Date(NA),
         max_date = as.Date(NA),
-        n_distinct = sapply(numeric_cols, function(col) as.integer(stats_numeric[[paste0(col, "_n_distinct")]])),
+        n_distinct = sapply(numeric_cols, function(col) as.integer(safe_extract_stat(stats_numeric, col, "n_distinct", 0))),
         created_at = Sys.time(),
         stringsAsFactors = FALSE
       )
@@ -140,9 +161,9 @@ create_column_info <- function(tablename,
         column_type = "date",
         min_value = NA_real_,
         max_value = NA_real_,
-        min_date = as.Date(sapply(date_cols, function(col) stats_date[[paste0(col, "_min")]])),
-        max_date = as.Date(sapply(date_cols, function(col) stats_date[[paste0(col, "_max")]])),
-        n_distinct = sapply(date_cols, function(col) as.integer(stats_date[[paste0(col, "_n_distinct")]])),
+        min_date = as.Date(sapply(date_cols, function(col) safe_extract_stat(stats_date, col, "min", NA))),
+        max_date = as.Date(sapply(date_cols, function(col) safe_extract_stat(stats_date, col, "max", NA))),
+        n_distinct = sapply(date_cols, function(col) as.integer(safe_extract_stat(stats_date, col, "n_distinct", 0))),
         created_at = Sys.time(),
         stringsAsFactors = FALSE
       )
@@ -156,7 +177,7 @@ create_column_info <- function(tablename,
         max_value = NA_real_,
         min_date = as.Date(NA),
         max_date = as.Date(NA),
-        n_distinct = sapply(categorical_cols, function(col) as.integer(stats_categorical[[paste0(col, "_n_distinct")]])),
+        n_distinct = sapply(categorical_cols, function(col) as.integer(safe_extract_stat(stats_categorical, col, "n_distinct", 0))),
         created_at = Sys.time(),
         stringsAsFactors = FALSE
       )
@@ -165,31 +186,38 @@ create_column_info <- function(tablename,
     # Combine all metadata
     metadata_df <- do.call(rbind, list(numeric_metadata, date_metadata, categorical_metadata))
     
-    # Process distinct values for categorical columns in batches
+    # Process distinct values for categorical columns
     distinct_values_list <- list()
     
     for (col in categorical_cols) {
       n_distinct <- metadata_df$n_distinct[metadata_df$column_name == col]
       
-      if (n_distinct <= max_distinct_values) {
+      if (n_distinct > 0 && n_distinct <= max_distinct_values) {
         message("Getting distinct values for: ", col)
-        values <- tbl_ref %>%
-          filter(!is.na(.data[[col]])) %>%
-          select(all_of(col)) %>%
-          distinct() %>%
-          arrange(.data[[col]]) %>%
-          collect() %>%
-          pull(col)
+        values <- tryCatch({
+          tbl_ref %>%
+            filter(!is.na(.data[[col]])) %>%
+            select(all_of(col)) %>%
+            distinct() %>%
+            arrange(.data[[col]]) %>%
+            collect() %>%
+            pull(col)
+        }, error = function(e) {
+          message(sprintf("Warning: Could not get distinct values for column %s: %s", col, e$message))
+          character(0)
+        })
         
-        if (is.factor(values)) {
-          values <- as.character(values)
+        if (length(values) > 0) {
+          if (is.factor(values)) {
+            values <- as.character(values)
+          }
+          
+          distinct_values_list[[col]] <- data.frame(
+            column_name = col,
+            value = values,
+            stringsAsFactors = FALSE
+          )
         }
-        
-        distinct_values_list[[col]] <- data.frame(
-          column_name = col,
-          value = values,
-          stringsAsFactors = FALSE
-        )
       }
     }
     
@@ -240,7 +268,6 @@ create_column_info <- function(tablename,
     stop(sprintf("Error creating column info: %s", e$message))
   })
 }
-
 #' Read column info from storage
 #' @param tablename Character. Name of the table
 #' @param storage_type Either "local" or "adls"
@@ -259,36 +286,67 @@ read_column_info <- function(tablename,
   
   storage <- get_storage_location(storage_type, local_dir, adls_endpoint, adls_container, sas_token)
   
+  # Initialize empty data frames with correct structure
+  empty_metadata <- data.frame(
+    column_name = character(),
+    column_type = character(),
+    min_value = numeric(),
+    max_value = numeric(),
+    min_date = as.Date(character()),
+    max_date = as.Date(character()),
+    n_distinct = integer(),
+    created_at = as.POSIXct(character()),
+    stringsAsFactors = FALSE
+  )
+  
+  empty_distinct_values <- data.frame(
+    column_name = character(),
+    value = character(),
+    stringsAsFactors = FALSE
+  )
+  
   if (storage$type == "local") {
     # Read metadata
     metadata_path <- file.path(storage$path, sprintf("column_info_%s.parquet", tablename))
     if (!file.exists(metadata_path)) {
-      stop(sprintf("Column info not found for table: %s", tablename))
+      warning(sprintf("Column info not found for table: %s", tablename))
+      return(list(metadata = empty_metadata, distinct_values = empty_distinct_values))
     }
-    metadata_df <- arrow::read_parquet(metadata_path)
+    
+    metadata_df <- tryCatch({
+      arrow::read_parquet(metadata_path)
+    }, error = function(e) {
+      warning(sprintf("Error reading metadata: %s", e$message))
+      empty_metadata
+    })
     
     # Read distinct values if they exist
     distinct_values_path <- file.path(storage$path, 
                                       sprintf("distinct_values_%s.parquet", tablename))
     distinct_values_df <- if (file.exists(distinct_values_path)) {
-      arrow::read_parquet(distinct_values_path)
+      tryCatch({
+        arrow::read_parquet(distinct_values_path)
+      }, error = function(e) {
+        warning(sprintf("Error reading distinct values: %s", e$message))
+        empty_distinct_values
+      })
     } else {
-      data.frame(
-        table_name = character(),
-        column_name = character(),
-        value = character(),
-        stringsAsFactors = FALSE
-      )
+      empty_distinct_values
     }
   } else {
     # For ADLS
-    # Read metadata
-    tmp_file <- tempfile(fileext = ".parquet")
-    storage_download(storage$container, 
-                     sprintf("column_info_%s.parquet", tablename), 
-                     tmp_file)
-    metadata_df <- arrow::read_parquet(tmp_file)
-    unlink(tmp_file)
+    metadata_df <- tryCatch({
+      tmp_file <- tempfile(fileext = ".parquet")
+      storage_download(storage$container, 
+                       sprintf("column_info_%s.parquet", tablename), 
+                       tmp_file)
+      df <- arrow::read_parquet(tmp_file)
+      unlink(tmp_file)
+      df
+    }, error = function(e) {
+      warning(sprintf("Error reading metadata from ADLS: %s", e$message))
+      empty_metadata
+    })
     
     # Try to read distinct values
     distinct_values_df <- tryCatch({
@@ -300,53 +358,25 @@ read_column_info <- function(tablename,
       unlink(tmp_file)
       df
     }, error = function(e) {
-      data.frame(
-        table_name = character(),
-        column_name = character(),
-        value = character(),
-        stringsAsFactors = FALSE
-      )
+      warning(sprintf("Error reading distinct values from ADLS: %s", e$message))
+      empty_distinct_values
     })
   }
   
+  # Ensure all expected columns are present in metadata
+  expected_cols <- names(empty_metadata)
+  missing_cols <- setdiff(expected_cols, names(metadata_df))
+  
+  if (length(missing_cols) > 0) {
+    warning(sprintf("Missing columns in metadata: %s", paste(missing_cols, collapse = ", ")))
+    for (col in missing_cols) {
+      metadata_df[[col]] <- empty_metadata[[col]][0]  # Add empty column of correct type
+    }
+  }
+  
+  # Return the results
   list(
     metadata = metadata_df,
     distinct_values = distinct_values_df
-  )
-}
-
-# Example usage:
-if (FALSE) {
-  # Local storage example
-  metadata <- create_column_info(
-    tablename = "diamonds",
-    pool = pool,
-    storage_type = "local",
-    local_dir = "column_info"
-  )
-  
-  # ADLS storage example
-  metadata <- create_column_info_enhanced(
-    tablename = "diamonds",
-    pool = pool,
-    storage_type = "adls",
-    adls_endpoint = "https://myaccount.dfs.core.windows.net",
-    adls_container = "mycontainer",
-    sas_token = "mysastoken"
-  )
-  
-  # Read metadata (in new tabular format)
-  metadata_df <- read_column_info(
-    tablename = "diamonds",
-    storage_type = "local",
-    local_dir = "column_info"
-  )
-  
-  # Read metadata (in legacy list format for backward compatibility)
-  col_info <- read_column_info(
-    tablename = "diamonds",
-    storage_type = "local",
-    local_dir = "column_info",
-    legacy_format = TRUE
   )
 }

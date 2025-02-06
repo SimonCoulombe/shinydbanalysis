@@ -61,7 +61,7 @@ create_date_input <- function(ns, metadata, initial_value) {
   )
 }
 
-#' Create categorical input with support for large value sets
+#' Create categorical input with support for large value sets and empty cases
 #' @noRd
 create_categorical_input <- function(ns, metadata, distinct_values, initial_value) {
   # Get values for this column
@@ -69,22 +69,91 @@ create_categorical_input <- function(ns, metadata, distinct_values, initial_valu
     filter(column_name == metadata$column_name) %>%
     pull(value)
   
+  n_distinct <- metadata$n_distinct
+  
+  if (n_distinct == 0) {
+    # Case 1: Column is all NA
+    return(
+      div(
+        class = "alert alert-warning",
+        style = "margin-bottom: 0;",
+        icon("exclamation-triangle"),
+        "This column contains only NULL/NA values"
+      )
+    )
+  }
+  
+  if (length(values) == 0 && n_distinct > max_distinct_values) {
+    # Case 2: Too many distinct values to fetch
+    return(
+      div(
+        class = "filter-info",
+        style = "background-color: #f8f9fa; padding: 10px; border-radius: 4px; border-left: 3px solid #6c757d;",
+        div(
+          style = "font-weight: bold; margin-bottom: 5px;",
+          sprintf("%d distinct values", n_distinct)
+        ),
+        div(
+          style = "color: #666; font-size: 0.9em;",
+          "Too many values to display. You can still enter specific values below:"
+        ),
+        div(
+          style = "margin-top: 10px;",
+          selectizeInput(
+            inputId = ns("filter_value"),
+            label = NULL,
+            choices = NULL,
+            multiple = TRUE,
+            options = list(
+              create = TRUE,
+              createOnBlur = TRUE,
+              placeholder = "Type values to filter...",
+              maxItems = 50
+            ),
+            width = "100%"
+          )
+        )
+      )
+    )
+  }
+  
+  if (length(values) == 0) {
+    # Case 3: Error fetching values but we know they exist
+    return(
+      div(
+        class = "alert alert-warning",
+        style = "margin-bottom: 0;",
+        icon("exclamation-triangle"),
+        sprintf("Could not load distinct values (count: %d). Please try refreshing.", n_distinct)
+      )
+    )
+  }
+  
+  # Case 4: Normal case with values
   if (length(values) <= 8) {
     # Use checkbox group for few values
     tagList(
       div(
         style = "margin-bottom: 10px;",
         div(
-          style = "display: flex; gap: 10px;",
-          actionButton(
-            inputId = ns("select_all"),
-            label = "Select All",
-            class = "btn-sm"
+          style = "display: flex; justify-content: space-between; align-items: center;",
+          div(
+            style = "display: flex; gap: 10px;",
+            actionButton(
+              inputId = ns("select_all"),
+              label = "Select All",
+              class = "btn-sm"
+            ),
+            actionButton(
+              inputId = ns("deselect_all"),
+              label = "Clear",
+              class = "btn-sm"
+            )
           ),
-          actionButton(
-            inputId = ns("deselect_all"),
-            label = "Clear",
-            class = "btn-sm"
+          span(
+            class = "text-muted",
+            style = "font-size: 0.9em;",
+            sprintf("%d values", length(values))
           )
         )
       ),
@@ -103,30 +172,24 @@ create_categorical_input <- function(ns, metadata, distinct_values, initial_valu
         style = "margin-bottom: 10px;",
         div(
           style = "display: flex; justify-content: space-between; align-items: center;",
+          div(
+            style = "display: flex; gap: 10px;",
+            actionButton(
+              inputId = ns("select_all"),
+              label = "Select All",
+              class = "btn-sm"
+            ),
+            actionButton(
+              inputId = ns("deselect_all"),
+              label = "Clear",
+              class = "btn-sm"
+            )
+          ),
           span(
             class = "text-muted",
             style = "font-size: 0.9em;",
-            if (length(values) > 0) {
-              sprintf("%d available values", length(values))
-            } else {
-              sprintf("Large column (%d distinct values) - Type to filter", metadata$n_distinct)
-            }
-          ),
-          if (length(values) > 0) {
-            div(
-              style = "display: flex; gap: 10px;",
-              actionButton(
-                inputId = ns("select_all"),
-                label = "Select All",
-                class = "btn-sm"
-              ),
-              actionButton(
-                inputId = ns("deselect_all"),
-                label = "Clear",
-                class = "btn-sm"
-              )
-            )
-          }
+            sprintf("%d values", length(values))
+          )
         )
       ),
       selectizeInput(
@@ -137,14 +200,10 @@ create_categorical_input <- function(ns, metadata, distinct_values, initial_valu
         multiple = TRUE,
         options = list(
           plugins = list('remove_button'),
-          create = TRUE,  # Allow manual input
+          create = TRUE,
           createOnBlur = TRUE,
-          placeholder = if (length(values) == 0) {
-            sprintf('Type values to filter (max %d items)...', 50)
-          } else {
-            sprintf('Select or type values (max %d)...', 50)
-          },
-          maxItems = 50  # Limit number of selected items
+          placeholder = sprintf('Select or type values (max %d)...', 50),
+          maxItems = 50
         ),
         width = "100%"
       )
