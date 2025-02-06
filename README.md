@@ -76,11 +76,6 @@ create_column_info("diamonds", pool)
 create_column_info("iris", pool)
 create_column_info("gapdata", pool)
 
-metadata_df <- read_column_info(
-    tablename = "gapdata",
-    storage_type = "local",
-    local_dir = "column_info"
-  )
 
 # Launch the app-
 # Local storage
@@ -100,9 +95,61 @@ run_app(
 # )
 ```
 
-![Dataset Analysis Tool](man/figures/readme1.png) ![Dataset Analysis
-Tool](man/figures/readme2.png) ![Dataset Analysis
-Tool](man/figures/readme3.png)
+Screenshot of the app after fetching some data:  
+![Dataset Analysis Tool](man/figures/readme1.png)
+
+Screenshot of the app after fetching some data and creating a data
+vizualisation:  
+![Dataset Analysis Tool](man/figures/readme2.png)
+
+Screenshot of the app in the “debug information” tab:
+
+<figure>
+<img src="man/figures/readme3.png" alt="Dataset Analysis Tool" />
+<figcaption aria-hidden="true">Dataset Analysis Tool</figcaption>
+</figure>
+
+Below is the example of the content of the column_info parquet files :
+
+``` r
+library(shinydbanalysis)
+metadata_df <- read_column_info(
+    tablename = "gapdata",
+    storage_type = "local",
+    local_dir = "column_info"
+  )
+#> The tzdb package is not installed. Timezones will not be available to Arrow compute functions.
+metadata_df
+#> $metadata
+#> # A tibble: 8 × 8
+#>   column_name column_type min_value   max_value min_date   max_date   n_distinct
+#>   <chr>       <chr>           <dbl>       <dbl> <date>     <date>          <int>
+#> 1 year        numeric        1992        2.01e3 NA         NA                  4
+#> 2 lifeExp     numeric          23.6      8.26e1 NA         NA                560
+#> 3 pop         numeric      125911        1.32e9 NA         NA                568
+#> 4 gdpPercap   numeric         241.       4.94e4 NA         NA                568
+#> 5 date        date             NA       NA      1992-01-01 2007-01-01          4
+#> 6 country     categorical      NA       NA      NA         NA                142
+#> 7 continent   categorical      NA       NA      NA         NA                  5
+#> 8 prout       categorical      NA       NA      NA         NA                  0
+#> # ℹ 1 more variable: created_at <dttm>
+#> 
+#> $distinct_values
+#> # A tibble: 147 × 2
+#>    column_name value      
+#>    <chr>       <chr>      
+#>  1 country     Afghanistan
+#>  2 country     Albania    
+#>  3 country     Algeria    
+#>  4 country     Angola     
+#>  5 country     Argentina  
+#>  6 country     Australia  
+#>  7 country     Austria    
+#>  8 country     Bahrain    
+#>  9 country     Bangladesh 
+#> 10 country     Belgium    
+#> # ℹ 137 more rows
+```
 
 ## Building a Custom App (Diamond Analysis)
 

@@ -69,11 +69,6 @@ create_column_info("diamonds", pool)
 create_column_info("iris", pool)
 create_column_info("gapdata", pool)
 
-metadata_df <- read_column_info(
-    tablename = "gapdata",
-    storage_type = "local",
-    local_dir = "column_info"
-  )
 
 # Launch the app-
 # Local storage
@@ -94,11 +89,28 @@ run_app(
 
 ```
 
-
+Screenshot of the app after fetching some data:  
 ![Dataset Analysis Tool](man/figures/readme1.png)
+
+Screenshot of the app after fetching some data and creating a data vizualisation:    
 ![Dataset Analysis Tool](man/figures/readme2.png)
+
+Screenshot of the app in the "debug information" tab:  
+
 ![Dataset Analysis Tool](man/figures/readme3.png)
 
+
+Below is the example of the content of the column_info parquet files :
+
+```{r}
+library(shinydbanalysis)
+metadata_df <- read_column_info(
+    tablename = "gapdata",
+    storage_type = "local",
+    local_dir = "column_info"
+  )
+metadata_df
+```
 
 
 
