@@ -40,7 +40,7 @@ create_column_info <- function(tablename,
                                adls_container = NULL,
                                sas_token = NULL,
                                max_distinct_values = 300,
-                               batch_size = 100) {
+                               batch_size = 50) {
   
   table_info <- parse_table_name(tablename)
   
