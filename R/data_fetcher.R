@@ -90,7 +90,6 @@ data_fetcher_ui <- function(id, style = "hover") {
 }
 
 #' Create data fetcher server logic
-#'
 #' @param id Character. The module ID
 #' @param pool Database connection pool
 #' @param table_info Table picker module instance
@@ -219,7 +218,6 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, summary_bu
     )
   })
 }
-
 
 # Helper Functions ----
 

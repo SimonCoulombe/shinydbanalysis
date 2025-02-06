@@ -12,7 +12,8 @@ run_app <- function(pool,
                     local_dir = "column_info",
                     adls_endpoint = NULL,
                     adls_container = NULL,
-                    sas_token = NULL) {
+                    sas_token = NULL,
+                    unavailable_columns = character(0)) {
   
   # Validate storage configuration
   storage_type <- match.arg(storage_type, c("local", "adls"))
@@ -112,12 +113,13 @@ run_app <- function(pool,
   
   server <- function(input, output, session) {
     # Initialize modules
-    table_info <- table_picker_server("table", pool, storage_info)
+    table_info <- table_picker_server("table", pool, storage_info, unavailable_columns = unavailable_columns)
     
     filter_results <- filter_builder_server(
       "filters",
       storage_info = storage_info,
-      selected_table = table_info$selected_table
+      selected_table = table_info$selected_table,
+      unavailable_columns = unavailable_columns
     )
     
     # Get current column info reactively for summary builder
@@ -129,7 +131,8 @@ run_app <- function(pool,
         local_dir = storage_info$local_dir,
         adls_endpoint = storage_info$adls_endpoint,
         adls_container = storage_info$adls_container,
-        sas_token = storage_info$sas_token
+        sas_token = storage_info$sas_token,
+        unavailable_columns = unavailable_columns
       )
     })
     

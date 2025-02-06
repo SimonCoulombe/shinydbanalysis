@@ -268,13 +268,16 @@ create_column_info <- function(tablename,
     stop(sprintf("Error creating column info: %s", e$message))
   })
 }
-#' Read column info from storage
+
+
+#' Read column info from storage, excluding unavailable columns
 #' @param tablename Character. Name of the table
 #' @param storage_type Either "local" or "adls"
 #' @param local_dir Path for local storage
 #' @param adls_endpoint ADLS endpoint URL
 #' @param adls_container ADLS container name
 #' @param sas_token ADLS SAS token
+#' @param unavailable_columns Character vector of columns to exclude
 #' @return List containing metadata_df and distinct_values_df
 #' @export
 read_column_info <- function(tablename,
@@ -282,7 +285,8 @@ read_column_info <- function(tablename,
                              local_dir = "column_info",
                              adls_endpoint = NULL,
                              adls_container = NULL,
-                             sas_token = NULL) {
+                             sas_token = NULL,
+                             unavailable_columns = character(0)) {
   
   storage <- get_storage_location(storage_type, local_dir, adls_endpoint, adls_container, sas_token)
   
@@ -306,7 +310,6 @@ read_column_info <- function(tablename,
   )
   
   if (storage$type == "local") {
-    # Read metadata
     metadata_path <- file.path(storage$path, sprintf("column_info_%s.parquet", tablename))
     if (!file.exists(metadata_path)) {
       warning(sprintf("Column info not found for table: %s", tablename))
@@ -314,18 +317,25 @@ read_column_info <- function(tablename,
     }
     
     metadata_df <- tryCatch({
-      arrow::read_parquet(metadata_path)
+      df <- arrow::read_parquet(metadata_path)
+      if (length(unavailable_columns) > 0) {
+        df <- df %>% filter(!column_name %in% unavailable_columns)
+      }
+      df
     }, error = function(e) {
       warning(sprintf("Error reading metadata: %s", e$message))
       empty_metadata
     })
     
-    # Read distinct values if they exist
     distinct_values_path <- file.path(storage$path, 
                                       sprintf("distinct_values_%s.parquet", tablename))
     distinct_values_df <- if (file.exists(distinct_values_path)) {
       tryCatch({
-        arrow::read_parquet(distinct_values_path)
+        df <- arrow::read_parquet(distinct_values_path)
+        if (length(unavailable_columns) > 0) {
+          df <- df %>% filter(!column_name %in% unavailable_columns)
+        }
+        df
       }, error = function(e) {
         warning(sprintf("Error reading distinct values: %s", e$message))
         empty_distinct_values
@@ -334,7 +344,7 @@ read_column_info <- function(tablename,
       empty_distinct_values
     }
   } else {
-    # For ADLS
+    # For ADLS storage
     metadata_df <- tryCatch({
       tmp_file <- tempfile(fileext = ".parquet")
       storage_download(storage$container, 
@@ -342,13 +352,15 @@ read_column_info <- function(tablename,
                        tmp_file)
       df <- arrow::read_parquet(tmp_file)
       unlink(tmp_file)
+      if (length(unavailable_columns) > 0) {
+        df <- df %>% filter(!column_name %in% unavailable_columns)
+      }
       df
     }, error = function(e) {
       warning(sprintf("Error reading metadata from ADLS: %s", e$message))
       empty_metadata
     })
     
-    # Try to read distinct values
     distinct_values_df <- tryCatch({
       tmp_file <- tempfile(fileext = ".parquet")
       storage_download(storage$container,
@@ -356,6 +368,9 @@ read_column_info <- function(tablename,
                        tmp_file)
       df <- arrow::read_parquet(tmp_file)
       unlink(tmp_file)
+      if (length(unavailable_columns) > 0) {
+        df <- df %>% filter(!column_name %in% unavailable_columns)
+      }
       df
     }, error = function(e) {
       warning(sprintf("Error reading distinct values from ADLS: %s", e$message))
@@ -363,18 +378,17 @@ read_column_info <- function(tablename,
     })
   }
   
-  # Ensure all expected columns are present in metadata
+  # Ensure all expected columns are present
   expected_cols <- names(empty_metadata)
   missing_cols <- setdiff(expected_cols, names(metadata_df))
   
   if (length(missing_cols) > 0) {
     warning(sprintf("Missing columns in metadata: %s", paste(missing_cols, collapse = ", ")))
     for (col in missing_cols) {
-      metadata_df[[col]] <- empty_metadata[[col]][0]  # Add empty column of correct type
+      metadata_df[[col]] <- empty_metadata[[col]][0]
     }
   }
   
-  # Return the results
   list(
     metadata = metadata_df,
     distinct_values = distinct_values_df
