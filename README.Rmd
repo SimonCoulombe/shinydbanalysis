@@ -51,7 +51,7 @@ library(arrow) # we save as parquet files
 library(dplyr) 
 library(AzureStor) # we can save column info to ADLS directly instead of local hardrive for deployment on servers
 
-gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01"))) %>% filter(year >= 1990)
+gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01"))) %>% filter(year >= 1990) %>% mutate(prout = NA_character_)
 # Create a DuckDB connection pool (in-memory database)
 pool <- dbPool(
   drv = duckdb::duckdb(),
@@ -70,7 +70,7 @@ create_column_info("iris", pool)
 create_column_info("gapdata", pool)
 
 metadata_df <- read_column_info(
-    tablename = "diamonds",
+    tablename = "gapdata",
     storage_type = "local",
     local_dir = "column_info"
   )
