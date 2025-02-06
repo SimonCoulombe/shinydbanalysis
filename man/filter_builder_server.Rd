@@ -4,7 +4,7 @@
 \alias{filter_builder_server}
 \title{Create filter builder server logic}
 \usage{
-filter_builder_server(id, storage_info, selected_table)
+filter_builder_server(id, storage_info, selected_table, restricted_columns)
 }
 \arguments{
 \item{id}{Character. The module ID}
@@ -12,6 +12,8 @@ filter_builder_server(id, storage_info, selected_table)
 \item{storage_info}{List with storage configuration}
 
 \item{selected_table}{Reactive. Selected table name}
+
+\item{restricted_columns}{Reactive. Columns to restrict}
 }
 \value{
 List of reactive expressions

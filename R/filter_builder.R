@@ -19,13 +19,13 @@ filter_builder_ui <- function(id) {
 #' @param id Character. The module ID
 #' @param storage_info List with storage configuration
 #' @param selected_table Reactive. Selected table name
+#' @param restricted_columns Reactive. Columns to restrict
 #' @return List of reactive expressions
 #' @export
-filter_builder_server <- function(id, storage_info, selected_table) {
+filter_builder_server <- function(id, storage_info, selected_table, restricted_columns) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
-    # State management
     state <- reactiveValues(
       modules = list(),
       filter_states = list()
@@ -35,7 +35,7 @@ filter_builder_server <- function(id, storage_info, selected_table) {
     column_info <- reactive({
       req(selected_table())
       
-      read_column_info(
+      info <- read_column_info(
         tablename = selected_table(),
         storage_type = storage_info$storage_type,
         local_dir = storage_info$local_dir,
@@ -43,39 +43,39 @@ filter_builder_server <- function(id, storage_info, selected_table) {
         adls_container = storage_info$adls_container,
         sas_token = storage_info$sas_token
       )
+      
+      # Filter out unavailable columns
+      restricted_cols <- if (is.reactive(restricted_columns)) {
+        restricted_columns()
+      } else {
+        restricted_columns
+      }
+      
+      if (length(restricted_cols) > 0) {
+        info$metadata <- info$metadata %>%
+          filter(!column_name %in% restricted_cols)
+        info$distinct_values <- info$distinct_values %>%
+          filter(!column_name %in% restricted_cols)
+      }
+      
+      info
     })
     
     # Clear filters when table changes
     observeEvent(selected_table(), {
-      # Immediately clear where clause to prevent invalid queries
       state$filter_states <- list()
-      
-      # Remove all filter UI elements first
       removeUI(selector = paste0("#", ns("filters"), " > *"))
-      
-      # Then reset module state
       state$modules <- list()
-      
-      # Reset the add filter dropdown
-      updateSelectInput(
-        session,
-        "add_filter",
-        choices = c("Select column" = "")
-      )
+      updateSelectInput(session, "add_filter", choices = c("Select column" = ""))
     }, ignoreInit = TRUE)
     
-    # Update available columns (separate observer to prevent race conditions)
+    # Update available columns
     observe({
       req(selected_table(), column_info())
       col_info <- column_info()
       
-      # Get active columns (those already with filters)
       active_columns <- sapply(state$modules, function(mod) mod$instance$column)
-      
-      # Get all available columns from metadata
       all_columns <- col_info$metadata$column_name
-      
-      # Get columns without filters
       available_columns <- setdiff(all_columns, active_columns)
       
       updateSelectInput(
@@ -90,7 +90,6 @@ filter_builder_server <- function(id, storage_info, selected_table) {
       req(input$add_filter != "")
       col_info <- column_info()
       
-      # Get metadata for selected column
       col_metadata <- col_info$metadata %>%
         filter(column_name == input$add_filter)
       
@@ -132,7 +131,7 @@ filter_builder_server <- function(id, storage_info, selected_table) {
       
       where_clauses <- build_where_clauses(state$modules)
       if (length(where_clauses) > 0) {
-        paste(where_clauses, collapse = " & ")  # Using & for SQL AND
+        paste(where_clauses, collapse = " & ")
       } else {
         ""
       }
@@ -149,7 +148,6 @@ filter_builder_server <- function(id, storage_info, selected_table) {
         full_id <- ns(id)
         col_name <- mods[[id]]$instance$column
         
-        # Get metadata for this column
         col_metadata <- col_info$metadata %>%
           filter(column_name == col_name)
         

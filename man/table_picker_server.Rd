@@ -2,9 +2,9 @@
 % Please edit documentation in R/table_picker.R
 \name{table_picker_server}
 \alias{table_picker_server}
-\title{Create table picker server}
+\title{Create table picker server with column restrictions}
 \usage{
-table_picker_server(id, pool, storage_info)
+table_picker_server(id, pool, storage_info, restricted_columns = character(0))
 }
 \arguments{
 \item{id}{Character. The module ID}
@@ -12,10 +12,12 @@ table_picker_server(id, pool, storage_info)
 \item{pool}{Pool object. Database connection pool}
 
 \item{storage_info}{List containing storage configuration}
+
+\item{restricted_columns}{Character vector. Column names to restrict}
 }
 \value{
 List of reactive expressions
 }
 \description{
-Create table picker server
+Create table picker server with column restrictions
 }
