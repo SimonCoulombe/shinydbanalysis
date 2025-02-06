@@ -26,9 +26,9 @@ The {shinydbanalysis} offer the following modules you can use in your own apps:
 
 * table_picker_server() , allows the user to pick the table they want to use.  The table must exist in the pool and also have had `create_column_info("tablename", pool, "column_info")` run to create it's metadata file.  
 * filter_builder_server()  allows the user to create the filters they want.   
-* group_builder_server() allows the user to select the grouping (categorical) variables they want to use     
 * summary_builder_server() allows the user to select the summary functions they want to use  (count, max, min ,mean) and on which (numeric) variables they want to apply them  
 * data_fetcher_server() creates a sql query from all of the above and returns the fetched table.   
+* plot_builder_server() allows the user to create a plot from the fetched data.  
 
 ## Installation
 
@@ -95,7 +95,9 @@ run_app(
 ```
 
 
-![Dataset Analysis Tool](man/figures/dataset_analysis_tool.png)
+![Dataset Analysis Tool](man/figures/readme1.png)
+![Dataset Analysis Tool](man/figures/readme2.png)
+![Dataset Analysis Tool](man/figures/readme3.png)
 
 
 

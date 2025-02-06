@@ -30,13 +30,13 @@ own apps:
   it’s metadata file.  
 - filter_builder_server() allows the user to create the filters they
   want.  
-- group_builder_server() allows the user to select the grouping
-  (categorical) variables they want to use  
 - summary_builder_server() allows the user to select the summary
   functions they want to use (count, max, min ,mean) and on which
   (numeric) variables they want to apply them  
 - data_fetcher_server() creates a sql query from all of the above and
-  returns the fetched table.
+  returns the fetched table.  
+- plot_builder_server() allows the user to create a plot from the
+  fetched data.
 
 ## Installation
 
@@ -100,11 +100,9 @@ run_app(
 # )
 ```
 
-<figure>
-<img src="man/figures/dataset_analysis_tool.png"
-alt="Dataset Analysis Tool" />
-<figcaption aria-hidden="true">Dataset Analysis Tool</figcaption>
-</figure>
+![Dataset Analysis Tool](man/figures/readme1.png) ![Dataset Analysis
+Tool](man/figures/readme2.png) ![Dataset Analysis
+Tool](man/figures/readme3.png)
 
 ## Building a Custom App (Diamond Analysis)
 
