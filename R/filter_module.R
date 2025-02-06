@@ -63,7 +63,7 @@ create_date_input <- function(ns, metadata, initial_value) {
 
 #' Create categorical input with support for large value sets and empty cases
 #' @noRd
-create_categorical_input <- function(ns, metadata, distinct_values, initial_value) {
+create_categorical_input <- function(ns, metadata, distinct_values, initial_value, max_distinct_values = 300) {
   # Get values for this column
   values <- distinct_values %>%
     filter(column_name == metadata$column_name) %>%
