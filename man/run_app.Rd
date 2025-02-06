@@ -10,7 +10,8 @@ run_app(
   local_dir = "column_info",
   adls_endpoint = NULL,
   adls_container = NULL,
-  sas_token = NULL
+  sas_token = NULL,
+  restricted_columns = character(0)
 )
 }
 \arguments{

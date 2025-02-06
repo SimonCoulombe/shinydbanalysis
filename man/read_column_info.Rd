@@ -2,7 +2,7 @@
 % Please edit documentation in R/create_column_info.R
 \name{read_column_info}
 \alias{read_column_info}
-\title{Read column info from storage}
+\title{Read column info from storage, excluding unavailable columns}
 \usage{
 read_column_info(
   tablename,
@@ -10,7 +10,8 @@ read_column_info(
   local_dir = "column_info",
   adls_endpoint = NULL,
   adls_container = NULL,
-  sas_token = NULL
+  sas_token = NULL,
+  restricted_columns = character(0)
 )
 }
 \arguments{
@@ -25,10 +26,12 @@ read_column_info(
 \item{adls_container}{ADLS container name}
 
 \item{sas_token}{ADLS SAS token}
+
+\item{restricted_columns}{Character vector of columns to exclude}
 }
 \value{
 List containing metadata_df and distinct_values_df
 }
 \description{
-Read column info from storage
+Read column info from storage, excluding unavailable columns
 }
