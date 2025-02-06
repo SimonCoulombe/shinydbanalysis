@@ -47,10 +47,10 @@ table_picker_ui <- function(id) {
 #' @param id Character. The module ID
 #' @param pool Pool object. Database connection pool
 #' @param storage_info List containing storage configuration
-#' @param unavailable_columns Character vector. Column names to restrict
+#' @param restricted_columns Character vector. Column names to restrict
 #' @return List of reactive expressions
 #' @export
-table_picker_server <- function(id, pool, storage_info, unavailable_columns = character(0)) {
+table_picker_server <- function(id, pool, storage_info, restricted_columns = character(0)) {
   moduleServer(id, function(input, output, session) {
     
     # Update available tables
@@ -86,10 +86,10 @@ table_picker_server <- function(id, pool, storage_info, unavailable_columns = ch
       req(table_info())
       tbl_ref <- create_table_ref(pool, table_info())
       
-      if (length(unavailable_columns) > 0) {
+      if (length(restricted_columns) > 0) {
         # Get all columns and filter out unavailable ones
         all_cols <- colnames(tbl_ref)
-        available_cols <- setdiff(all_cols, unavailable_columns)
+        available_cols <- setdiff(all_cols, restricted_columns)
         tbl_ref %>% select(all_of(available_cols))
       } else {
         tbl_ref
@@ -101,7 +101,7 @@ table_picker_server <- function(id, pool, storage_info, unavailable_columns = ch
       selected_table = reactive(input$table_select),
       table_info = table_info,
       create_table_ref = create_filtered_ref,
-      unavailable_columns = reactive(unavailable_columns)
+      restricted_columns = reactive(restricted_columns)
     )
   })
 }
@@ -109,7 +109,7 @@ table_picker_server <- function(id, pool, storage_info, unavailable_columns = ch
 #' Get list of available tables with column info files, excluding restricted columns
 #' @param storage_info List containing storage configuration
 #' @param pool Database connection pool
-#' @param unavailable_columns Character vector of columns to restrict
+#' @param restricted_columns Character vector of columns to restrict
 #' @return Named character vector of available tables
 #' @noRd
 get_available_tables <- function(storage_info, pool) {

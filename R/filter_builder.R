@@ -19,10 +19,10 @@ filter_builder_ui <- function(id) {
 #' @param id Character. The module ID
 #' @param storage_info List with storage configuration
 #' @param selected_table Reactive. Selected table name
-#' @param unavailable_columns Reactive. Columns to restrict
+#' @param restricted_columns Reactive. Columns to restrict
 #' @return List of reactive expressions
 #' @export
-filter_builder_server <- function(id, storage_info, selected_table, unavailable_columns) {
+filter_builder_server <- function(id, storage_info, selected_table, restricted_columns) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
@@ -45,10 +45,10 @@ filter_builder_server <- function(id, storage_info, selected_table, unavailable_
       )
       
       # Filter out unavailable columns
-      restricted_cols <- if (is.reactive(unavailable_columns)) {
-        unavailable_columns()
+      restricted_cols <- if (is.reactive(restricted_columns)) {
+        restricted_columns()
       } else {
-        unavailable_columns
+        restricted_columns
       }
       
       if (length(restricted_cols) > 0) {

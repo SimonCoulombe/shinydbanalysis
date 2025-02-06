@@ -151,6 +151,22 @@ metadata_df
 #> # ℹ 137 more rows
 ```
 
+## Restricting columns
+
+You may want to restrict the users from accessing certain columns
+without modifying the whole base.. You can use the “restricted_columns”
+parameter. Here we will remove ‘continent’. It wont be available for
+filtereding/grouping and wont be fetched.
+
+``` r
+run_app(
+  pool = pool,
+  storage_type = "local",
+  local_dir = "column_info",
+  restricted_columns = c("continent")
+)
+```
+
 ## Building a Custom App (Diamond Analysis)
 
 For more control, you can build your own Shiny app using the package’s

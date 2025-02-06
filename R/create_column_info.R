@@ -277,7 +277,7 @@ create_column_info <- function(tablename,
 #' @param adls_endpoint ADLS endpoint URL
 #' @param adls_container ADLS container name
 #' @param sas_token ADLS SAS token
-#' @param unavailable_columns Character vector of columns to exclude
+#' @param restricted_columns Character vector of columns to exclude
 #' @return List containing metadata_df and distinct_values_df
 #' @export
 read_column_info <- function(tablename,
@@ -286,7 +286,7 @@ read_column_info <- function(tablename,
                              adls_endpoint = NULL,
                              adls_container = NULL,
                              sas_token = NULL,
-                             unavailable_columns = character(0)) {
+                             restricted_columns = character(0)) {
   
   storage <- get_storage_location(storage_type, local_dir, adls_endpoint, adls_container, sas_token)
   
@@ -318,8 +318,8 @@ read_column_info <- function(tablename,
     
     metadata_df <- tryCatch({
       df <- arrow::read_parquet(metadata_path)
-      if (length(unavailable_columns) > 0) {
-        df <- df %>% filter(!column_name %in% unavailable_columns)
+      if (length(restricted_columns) > 0) {
+        df <- df %>% filter(!column_name %in% restricted_columns)
       }
       df
     }, error = function(e) {
@@ -332,8 +332,8 @@ read_column_info <- function(tablename,
     distinct_values_df <- if (file.exists(distinct_values_path)) {
       tryCatch({
         df <- arrow::read_parquet(distinct_values_path)
-        if (length(unavailable_columns) > 0) {
-          df <- df %>% filter(!column_name %in% unavailable_columns)
+        if (length(restricted_columns) > 0) {
+          df <- df %>% filter(!column_name %in% restricted_columns)
         }
         df
       }, error = function(e) {
@@ -352,8 +352,8 @@ read_column_info <- function(tablename,
                        tmp_file)
       df <- arrow::read_parquet(tmp_file)
       unlink(tmp_file)
-      if (length(unavailable_columns) > 0) {
-        df <- df %>% filter(!column_name %in% unavailable_columns)
+      if (length(restricted_columns) > 0) {
+        df <- df %>% filter(!column_name %in% restricted_columns)
       }
       df
     }, error = function(e) {
@@ -368,8 +368,8 @@ read_column_info <- function(tablename,
                        tmp_file)
       df <- arrow::read_parquet(tmp_file)
       unlink(tmp_file)
-      if (length(unavailable_columns) > 0) {
-        df <- df %>% filter(!column_name %in% unavailable_columns)
+      if (length(restricted_columns) > 0) {
+        df <- df %>% filter(!column_name %in% restricted_columns)
       }
       df
     }, error = function(e) {
