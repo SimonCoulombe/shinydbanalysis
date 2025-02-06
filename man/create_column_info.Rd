@@ -12,7 +12,8 @@ create_column_info(
   adls_endpoint = NULL,
   adls_container = NULL,
   sas_token = NULL,
-  max_distinct_values = 300
+  max_distinct_values = 300,
+  batch_size = 50
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ create_column_info(
 \item{sas_token}{ADLS SAS token}
 
 \item{max_distinct_values}{Integer. Maximum number of distinct values to store}
+
+\item{batch_size}{Integer. Number of columns to process in each batch}
 }
 \value{
 List containing metadata_df and distinct_values_df (invisibly)

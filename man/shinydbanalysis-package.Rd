@@ -4,12 +4,12 @@
 \name{shinydbanalysis-package}
 \alias{shinydbanalysis}
 \alias{shinydbanalysis-package}
-\title{shinydbanalysis: What the Package Does (One Line, Title Case)}
+\title{shinydbanalysis: A database-agnostic Shiny-based tool for filtering, grouping, and summarizing database tables.}
 \description{
 A Shiny-based tool for filtering, grouping, and summarizing database tables.
 }
 \author{
-\strong{Maintainer}: First Last \email{first.last@example.com}
+\strong{Maintainer}: Simon Coulombe \email{first.last@example.com}
 
 }
 \keyword{internal}

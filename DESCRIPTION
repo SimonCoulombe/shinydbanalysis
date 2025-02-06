@@ -1,8 +1,8 @@
 Package: shinydbanalysis
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
+Title: A database-agnostic Shiny-based tool for filtering, grouping, and summarizing database tables.
+Version: 1.0
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
+    person("Simon", "Coulombe", , "first.last@example.com", role = c("aut", "cre"))
 Description: A Shiny-based tool for filtering, grouping, and summarizing database tables.
 License: MIT
 Imports:
@@ -14,7 +14,10 @@ Imports:
     RSQLite,
     rlang,
     magrittr,
-    DT
+    DT,
+    arrow,
+    AzureStor,
+    plotly
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
