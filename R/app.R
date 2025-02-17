@@ -2,14 +2,14 @@
 #'
 #' @param pool A database connection pool object
 #' @param storage_type Either "local" or "adls"
-#' @param local_dir Path for local storage (default: "column_info")
+#' @param column_info_dir Path for storing column info parquet files on either local or adls container (default: "column_info")
 #' @param adls_endpoint ADLS endpoint URL (required if storage_type = "adls")
 #' @param adls_container ADLS container name (required if storage_type = "adls")
 #' @param sas_token ADLS SAS token (required if storage_type = "adls")
 #' @export
 run_app <- function(pool,
                     storage_type = "local",
-                    local_dir = "column_info",
+                    column_info_dir = "column_info",
                     adls_endpoint = NULL,
                     adls_container = NULL,
                     sas_token = NULL,
@@ -27,7 +27,7 @@ run_app <- function(pool,
   # Create storage info list
   storage_info <- list(
     storage_type = storage_type,
-    local_dir = local_dir,
+    column_info_dir = column_info_dir,
     adls_endpoint = adls_endpoint,
     adls_container = adls_container,
     sas_token = sas_token
@@ -128,7 +128,7 @@ run_app <- function(pool,
       read_column_info(
         tablename = table_info$selected_table(),
         storage_type = storage_info$storage_type,
-        local_dir = storage_info$local_dir,
+        column_info_dir = storage_info$column_info_dir,
         adls_endpoint = storage_info$adls_endpoint,
         adls_container = storage_info$adls_container,
         sas_token = storage_info$sas_token,

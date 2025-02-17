@@ -115,7 +115,7 @@ table_picker_server <- function(id, pool, storage_info, restricted_columns = cha
 get_available_tables <- function(storage_info, pool) {
   if (storage_info$storage_type == "local") {
     # Get tables with column info files from local storage
-    col_info_files <- list.files(storage_info$local_dir, 
+    col_info_files <- list.files(storage_info$column_info_dir, 
                                  pattern = "^column_info_.*\\.parquet$")
     table_names <- gsub("^column_info_(.+)\\.parquet$", "\\1", col_info_files)
   } else {
@@ -125,10 +125,12 @@ get_available_tables <- function(storage_info, pool) {
     container <- storage_container(endpoint, storage_info$adls_container)
     
     # List files in container
-    files <- azure_files(container)
+    files <- AzureStor::list_storage_files(container, storage_info$column_info_dir) %>% filter(isdir == FALSE)
     
     # Filter for column info files
-    col_info_files <- files$name[grepl("^column_info_.*\\.parquet$", files$name)]
+    files_basename <- basename (files$name )
+    
+    col_info_files <- files_basename[grepl("^column_info_.*\\.parquet$", files_basename)]
     table_names <- gsub("^column_info_(.+)\\.parquet$", "\\1", col_info_files)
   }
   
