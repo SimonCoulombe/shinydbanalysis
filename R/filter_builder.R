@@ -38,7 +38,7 @@ filter_builder_server <- function(id, storage_info, selected_table, restricted_c
       info <- read_column_info(
         tablename = selected_table(),
         storage_type = storage_info$storage_type,
-        local_dir = storage_info$local_dir,
+        column_info_dir = storage_info$column_info_dir,
         adls_endpoint = storage_info$adls_endpoint,
         adls_container = storage_info$adls_container,
         sas_token = storage_info$sas_token

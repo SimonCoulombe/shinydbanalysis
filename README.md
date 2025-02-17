@@ -82,17 +82,8 @@ create_column_info("gapdata", pool)
 run_app(
   pool = pool,
   storage_type = "local",
-  local_dir = "column_info"
+  column_info_dir = "column_info"
 )
-
-# ADLS storage
-#run_app(
-#   pool = pool,
-#   storage_type = "adls",
-#   adls_endpoint = "https://myaccount.dfs.core.windows.net",
-#   adls_container = "mycontainer",
-#   sas_token = "mysastoken"
-# )
 ```
 
 Screenshot of the app after fetching some data:  
@@ -109,6 +100,31 @@ Screenshot of the app in the “debug information” tab:
 <figcaption aria-hidden="true">Dataset Analysis Tool</figcaption>
 </figure>
 
+example code using ADLS
+
+``` r
+
+# ADLS version
+shinydbanalysis::create_column_info(
+  tablename = "myschema.iris", 
+  pool = pool,
+  storage_type = "adls",
+  column_info_dir = "column_info",
+  adls_endpoint = "https://myadlsenpoint.blob.core.windows.net/", 
+  adls_container =Sys.getenv("adls_container"),
+  sas_token = Sys.getenv("sas_token_dev"))
+
+
+run_app(
+   pool = pool,
+   storage_type = "adls",
+   column_info_dir = "column_info", 
+   adls_endpoint = "https://myadlsenpoint.blob.core.windows.net/", 
+   adls_container =Sys.getenv("adls_container"),
+   sas_token = Sys.getenv("sas_token_dev"))
+ )
+```
+
 Below is the example of the content of the column_info parquet files :
 
 ``` r
@@ -116,9 +132,8 @@ library(shinydbanalysis)
 metadata_df <- read_column_info(
     tablename = "gapdata",
     storage_type = "local",
-    local_dir = "column_info"
+    column_info_dir = "column_info"
   )
-#> The tzdb package is not installed. Timezones will not be available to Arrow compute functions.
 metadata_df
 #> $metadata
 #> # A tibble: 8 × 8
@@ -162,7 +177,7 @@ filtereding/grouping and wont be fetched.
 run_app(
   pool = pool,
   storage_type = "local",
-  local_dir = "column_info",
+  column_info_dir = "column_info",
   restricted_columns = c("continent")
 )
 ```
@@ -196,13 +211,13 @@ create_column_info(
   tablename = "diamonds",
   pool = pool,
   storage_type = "local",
-  local_dir = "column_info"
+  column_info_dir = "column_info"
 )
 
 # Create storage info configuration
 storage_info <- list(
   storage_type = "local",
-  local_dir = "column_info",
+  column_info_dir = "column_info",
   adls_endpoint = NULL,
   adls_container = NULL,
   sas_token = NULL
@@ -240,7 +255,7 @@ server <- function(input, output, session) {
     read_column_info(
       tablename = table_info$selected_table(),
       storage_type = storage_info$storage_type,
-      local_dir = storage_info$local_dir
+      column_info_dir = storage_info$column_info_dir
     )
   })
   
@@ -329,14 +344,14 @@ create_column_info(
   tablename = "mtcars",
   pool = pool,
   storage_type = "local",
-  local_dir = "column_info"
+  column_info_dir = "column_info"
 )
 
 # Launch the app with explicit storage configuration
 run_app(
   pool = pool,
   storage_type = "local",
-  local_dir = "column_info"
+  column_info_dir = "column_info"
 )
 ```
 

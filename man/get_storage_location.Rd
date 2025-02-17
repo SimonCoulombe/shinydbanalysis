@@ -6,7 +6,7 @@
 \usage{
 get_storage_location(
   storage_type,
-  local_dir,
+  column_info_dir,
   adls_endpoint,
   adls_container,
   sas_token
@@ -15,7 +15,7 @@ get_storage_location(
 \arguments{
 \item{storage_type}{Either "local" or "adls"}
 
-\item{local_dir}{Path for local storage}
+\item{column_info_dir}{Path for local storage}
 
 \item{adls_endpoint}{ADLS endpoint URL}
 

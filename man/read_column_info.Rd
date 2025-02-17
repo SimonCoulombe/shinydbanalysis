@@ -7,7 +7,7 @@
 read_column_info(
   tablename,
   storage_type = "local",
-  local_dir = "column_info",
+  column_info_dir = "column_info",
   adls_endpoint = NULL,
   adls_container = NULL,
   sas_token = NULL,
@@ -19,7 +19,7 @@ read_column_info(
 
 \item{storage_type}{Either "local" or "adls"}
 
-\item{local_dir}{Path for local storage}
+\item{column_info_dir}{Path for local storage}
 
 \item{adls_endpoint}{ADLS endpoint URL}
 

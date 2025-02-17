@@ -7,7 +7,7 @@
 run_app(
   pool,
   storage_type = "local",
-  local_dir = "column_info",
+  column_info_dir = "column_info",
   adls_endpoint = NULL,
   adls_container = NULL,
   sas_token = NULL,
@@ -19,7 +19,7 @@ run_app(
 
 \item{storage_type}{Either "local" or "adls"}
 
-\item{local_dir}{Path for local storage (default: "column_info")}
+\item{column_info_dir}{Path for storing column info parquet files on either local or adls container (default: "column_info")}
 
 \item{adls_endpoint}{ADLS endpoint URL (required if storage_type = "adls")}
 

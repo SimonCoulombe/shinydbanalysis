@@ -1,20 +1,20 @@
 #' Get storage location helper function
 #' @param storage_type Either "local" or "adls"
-#' @param local_dir Path for local storage
+#' @param column_info_dir Path for local storage
 #' @param adls_endpoint ADLS endpoint URL
 #' @param adls_container ADLS container name
 #' @param sas_token ADLS SAS token
 #' @return List with storage information
-get_storage_location <- function(storage_type, local_dir, adls_endpoint, adls_container, sas_token) {
+get_storage_location <- function(storage_type, column_info_dir, adls_endpoint, adls_container, sas_token) {
   if (storage_type == "local") {
-    if (!dir.exists(local_dir)) {
-      dir.create(local_dir, recursive = TRUE)
+    if (!dir.exists(column_info_dir)) {
+      dir.create(column_info_dir, recursive = TRUE)
     }
-    return(list(type = "local", path = local_dir))
+    return(list(type = "local", path = column_info_dir))
   } else if (storage_type == "adls") {
     endpoint <- storage_endpoint(adls_endpoint, sas=sas_token)
     cont <- storage_container(endpoint, adls_container)
-    return(list(type = "adls", container = cont))
+    return(list(type = "adls", container = cont, path = column_info_dir))
   }
   stop("Invalid storage type")
 }
@@ -24,7 +24,7 @@ get_storage_location <- function(storage_type, local_dir, adls_endpoint, adls_co
 #' @param tablename Character. Name of the table to analyze
 #' @param pool Pool object. Database connection pool
 #' @param storage_type Either "local" or "adls"
-#' @param local_dir Path for local storage
+#' @param column_info_dir Path for local storage
 #' @param adls_endpoint ADLS endpoint URL
 #' @param adls_container ADLS container name
 #' @param sas_token ADLS SAS token
@@ -35,7 +35,7 @@ get_storage_location <- function(storage_type, local_dir, adls_endpoint, adls_co
 create_column_info <- function(tablename, 
                                pool,
                                storage_type = "local",
-                               local_dir = "column_info",
+                               column_info_dir = "column_info",
                                adls_endpoint = NULL,
                                adls_container = NULL,
                                sas_token = NULL,
@@ -123,7 +123,7 @@ create_column_info <- function(tablename,
       
       # Combine batch results
       if (length(batch_results) > 0) {
-        Reduce(bind_cols, batch_results)
+        Reduce(dplyr::bind_cols, batch_results)
       } else {
         NULL
       }
@@ -222,10 +222,10 @@ create_column_info <- function(tablename,
     }
     
     # Combine distinct values
-    distinct_values_df <- bind_rows(distinct_values_list)
+    distinct_values_df <- dplyr::bind_rows(distinct_values_list)
     
     # Storage handling
-    storage <- get_storage_location(storage_type, local_dir, adls_endpoint, adls_container, sas_token)
+    storage <- get_storage_location(storage_type, column_info_dir, adls_endpoint, adls_container, sas_token)
     
     if (storage$type == "local") {
       arrow::write_parquet(
@@ -244,15 +244,15 @@ create_column_info <- function(tablename,
     } else {
       tmp_file <- tempfile(fileext = ".parquet")
       arrow::write_parquet(metadata_df, tmp_file)
-      storage_upload(storage$container, tmp_file, 
-                     sprintf("column_info_%s.parquet", tablename))
+      path <- file.path(storage$path, sprintf("column_info_%s.parquet", tablename))
+      AzureStor::storage_upload(storage$container, tmp_file, path)
       unlink(tmp_file)
       
       if (nrow(distinct_values_df) > 0) {
         tmp_file <- tempfile(fileext = ".parquet")
         arrow::write_parquet(distinct_values_df, tmp_file)
-        storage_upload(storage$container, tmp_file, 
-                       sprintf("distinct_values_%s.parquet", tablename))
+        path <- file.path(storage$path, sprintf("distinct_values_%s.parquet", tablename))
+        AzureStor::storage_upload(storage$container, tmp_file,  path)
         unlink(tmp_file)
       }
       
@@ -273,7 +273,7 @@ create_column_info <- function(tablename,
 #' Read column info from storage, excluding unavailable columns
 #' @param tablename Character. Name of the table
 #' @param storage_type Either "local" or "adls"
-#' @param local_dir Path for local storage
+#' @param column_info_dir Path for local storage
 #' @param adls_endpoint ADLS endpoint URL
 #' @param adls_container ADLS container name
 #' @param sas_token ADLS SAS token
@@ -282,13 +282,13 @@ create_column_info <- function(tablename,
 #' @export
 read_column_info <- function(tablename,
                              storage_type = "local",
-                             local_dir = "column_info",
+                             column_info_dir = "column_info",
                              adls_endpoint = NULL,
                              adls_container = NULL,
                              sas_token = NULL,
                              restricted_columns = character(0)) {
   
-  storage <- get_storage_location(storage_type, local_dir, adls_endpoint, adls_container, sas_token)
+  storage <- get_storage_location(storage_type, column_info_dir, adls_endpoint, adls_container, sas_token)
   
   # Initialize empty data frames with correct structure
   empty_metadata <- data.frame(
@@ -347,8 +347,9 @@ read_column_info <- function(tablename,
     # For ADLS storage
     metadata_df <- tryCatch({
       tmp_file <- tempfile(fileext = ".parquet")
-      storage_download(storage$container, 
-                       sprintf("column_info_%s.parquet", tablename), 
+      path <- file.path(storage$path, sprintf("column_info_%s.parquet", tablename))
+      AzureStor::storage_download(storage$container, 
+                       path, 
                        tmp_file)
       df <- arrow::read_parquet(tmp_file)
       unlink(tmp_file)
@@ -363,8 +364,9 @@ read_column_info <- function(tablename,
     
     distinct_values_df <- tryCatch({
       tmp_file <- tempfile(fileext = ".parquet")
-      storage_download(storage$container,
-                       sprintf("distinct_values_%s.parquet", tablename),
+      path <- file.path(storage$path, sprintf("distinct_values_%s.parquet", tablename))
+      AzureStor::storage_download(storage$container,
+                       path,
                        tmp_file)
       df <- arrow::read_parquet(tmp_file)
       unlink(tmp_file)
