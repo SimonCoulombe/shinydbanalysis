@@ -1,4 +1,3 @@
-
 #' Parse schema and table name
 #'
 #' @param full_table_name Character string that might contain schema (e.g., "schema.table")
@@ -53,34 +52,50 @@ table_picker_ui <- function(id) {
 table_picker_server <- function(id, pool, storage_info, restricted_columns = character(0)) {
   moduleServer(id, function(input, output, session) {
     
-    # Update available tables
-    observe({
-      available_tables <- try(get_available_tables(storage_info, pool))
+    # Reactive value to store available tables
+    available_tables <- reactiveVal(character(0))
+    
+    # Function to update available tables
+    update_available_tables <- function() {
+      tables <- try(get_available_tables(storage_info, pool))
       
-      if (inherits(available_tables, "try-error")) {
-        warning("Error getting available tables: ", available_tables)
-        available_tables <- character(0)
+      if (inherits(tables, "try-error")) {
+        warning("Error getting available tables: ", tables)
+        tables <- character(0)
       }
       
-      updateSelectInput(
-        session,
-        "table_select",
-        choices = c("Select table" = "", available_tables),
-        selected = input$table_select
-      )
+      available_tables(tables)
+    }
+    
+    # Initial call to update available tables
+    update_available_tables()
+    
+    # Observe changes to available tables and update the select input
+    observeEvent(available_tables(), {
+      tables <- available_tables()
+      if (length(tables) > 0) {
+        updateSelectInput(
+          session,
+          "table_select",
+          choices = c("Select table" = "", tables),
+          selected = NULL
+        )
+      }
     })
     
-    # Parse selected table name
-    table_info <- reactive({
+    # Observe changes to the table selection input
+    observeEvent(input$table_select, {
       req(input$table_select)
       validate(need(
         input$table_select != "",
         "Please select a valid table"
       ))
-      
-      parse_table_name(input$table_select)
+      table_info(parse_table_name(input$table_select))
     })
     
+    # Reactive value to store the selected table info
+    table_info <- reactiveVal(NULL)
+        
     # Create filtered table reference
     create_filtered_ref <- reactive({
       req(table_info())
