@@ -7,14 +7,13 @@
 #' @param adls_container ADLS container name (required if storage_type = "adls")
 #' @param sas_token ADLS SAS token (required if storage_type = "adls")
 #' @export
-run_app <- function(pool,
+demo_shinydbanalysis_app <- function(pool,
                     storage_type = "local",
                     column_info_dir = "column_info",
                     adls_endpoint = NULL,
                     adls_container = NULL,
                     sas_token = NULL,
                     restricted_columns = character(0)) {
-  
   # Validate storage configuration
   storage_type <- match.arg(storage_type, c("local", "adls"))
   

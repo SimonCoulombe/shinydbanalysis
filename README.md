@@ -45,21 +45,40 @@ own apps:
 devtools::install_github("SimonCoulombe/shinydbanalysis")
 ```
 
-## Quick Start: Built-in App “run_app” with Example Data
+# Quick Start: Built-in App “demo_shinydbanalysis_app” with Example Data
+
+## Data prep for example
+
+some pre-work to create the “column-\_info” metadata and connect to a
+database
 
 ``` r
-
 library(shinydbanalysis)
 library(duckdb) # for local database example
+#> Loading required package: DBI
 library(pool)
 library(ggplot2)  # for the diamonds dataset
 library(gapminder) # for gapminder dataset 
 library(arrow) # we save as parquet files  
+#> 
+#> Attaching package: 'arrow'
+#> The following object is masked from 'package:utils':
+#> 
+#>     timestamp
 library(dplyr) 
+#> 
+#> Attaching package: 'dplyr'
+#> The following objects are masked from 'package:stats':
+#> 
+#>     filter, lag
+#> The following objects are masked from 'package:base':
+#> 
+#>     intersect, setdiff, setequal, union
 library(AzureStor) # we can save column info to ADLS directly instead of local hardrive for deployment on servers
 
-gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01"))) %>% filter(year >= 1990) %>% mutate(prout = NA_character_)
-# Create a DuckDB connection pool (in-memory database)
+gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01")))  %>% mutate(prout = NA_character_)
+# Create a DuckDB connection pool (in-memory database) 
+# this represents the SQL server you are going to connect to.
 pool <- dbPool(
   drv = duckdb::duckdb(),
   dbdir = ":memory:"
@@ -73,13 +92,42 @@ dbWriteTable(pool, SQL("gapdata"), gapdata)
 
 # Generate column information for each table
 create_column_info("diamonds", pool)
+#> Getting column types...
+#> Processing 7 numeric columns...
+#> Processing batch: carat, depth, table, price, x, y, z
+#> Processing 0 date columns...
+#> Processing 3 categorical columns...
+#> Processing batch: cut, color, clarity
+#> Getting distinct values for: cut
+#> Getting distinct values for: color
+#> Getting distinct values for: clarity
+#> Column info saved to: column_info
 create_column_info("iris", pool)
+#> Getting column types...
+#> Processing 4 numeric columns...
+#> Processing batch: Sepal.Length, Sepal.Width, Petal.Length, Petal.Width
+#> Processing 0 date columns...
+#> Processing 1 categorical columns...
+#> Processing batch: Species
+#> Getting distinct values for: Species
+#> Column info saved to: column_info
 create_column_info("gapdata", pool)
+#> Getting column types...
+#> Processing 4 numeric columns...
+#> Processing batch: year, lifeExp, pop, gdpPercap
+#> Processing 1 date columns...
+#> Processing batch: date
+#> Processing 3 categorical columns...
+#> Processing batch: country, continent, prout
+#> Getting distinct values for: country
+#> Getting distinct values for: continent
+#> Column info saved to: column_info
+```
 
+## Demo app (local storage type)
 
-# Launch the app-
-# Local storage
-run_app(
+``` r
+shinydbanalysis::demo_shinydbanalysis_app(
   pool = pool,
   storage_type = "local",
   column_info_dir = "column_info"
@@ -100,7 +148,21 @@ Screenshot of the app in the “debug information” tab:
 <figcaption aria-hidden="true">Dataset Analysis Tool</figcaption>
 </figure>
 
-example code using ADLS
+## Demo : Launch the all-in-one module Demo app (local storage type)
+
+``` r
+library(bslib)
+storage_info <- list(
+  storage_type = "local",
+  column_info_dir = "column_info"
+)
+restricted_columns <- character(0)
+demo_shinydbanalysis_app_all_in_one_module(pool, storage_info, restricted_columns)
+```
+
+## Demo: Use ADLS (azure data lake storage) to store column-info
+
+Useful if you are hosting you app on Posit Connect instead of locally.
 
 ``` r
 
@@ -115,35 +177,37 @@ shinydbanalysis::create_column_info(
   sas_token = Sys.getenv("sas_token_dev"))
 
 
-run_app(
-   pool = pool,
-   storage_type = "adls",
-   column_info_dir = "column_info", 
-   adls_endpoint = "https://myadlsenpoint.blob.core.windows.net/", 
-   adls_container =Sys.getenv("adls_container"),
-   sas_token = Sys.getenv("sas_token_dev"))
- )
+demo_shinydbanalysis_app(
+  pool = pool,
+  storage_type = "adls",
+  column_info_dir = "column_info", 
+  adls_endpoint = "https://myadlsenpoint.blob.core.windows.net/", 
+  adls_container =Sys.getenv("adls_container"),
+  sas_token = Sys.getenv("sas_token_dev"))
+)
 ```
 
-Below is the example of the content of the column_info parquet files :
+## column_info metadata
+
+Here is an example of the content of the column_info parquet files :
 
 ``` r
-library(shinydbanalysis)
+
 metadata_df <- read_column_info(
-    tablename = "gapdata",
-    storage_type = "local",
-    column_info_dir = "column_info"
-  )
+  tablename = "gapdata",
+  storage_type = "local",
+  column_info_dir = "column_info"
+)
 metadata_df
 #> $metadata
 #> # A tibble: 8 × 8
 #>   column_name column_type min_value   max_value min_date   max_date   n_distinct
 #>   <chr>       <chr>           <dbl>       <dbl> <date>     <date>          <int>
-#> 1 year        numeric        1992        2.01e3 NA         NA                  4
-#> 2 lifeExp     numeric          23.6      8.26e1 NA         NA                560
-#> 3 pop         numeric      125911        1.32e9 NA         NA                568
-#> 4 gdpPercap   numeric         241.       4.94e4 NA         NA                568
-#> 5 date        date             NA       NA      1992-01-01 2007-01-01          4
+#> 1 year        numeric        1952        2.01e3 NA         NA                 12
+#> 2 lifeExp     numeric          23.6      8.26e1 NA         NA               1626
+#> 3 pop         numeric       60011        1.32e9 NA         NA               1704
+#> 4 gdpPercap   numeric         241.       1.14e5 NA         NA               1704
+#> 5 date        date             NA       NA      1952-01-01 2007-01-01         12
 #> 6 country     categorical      NA       NA      NA         NA                142
 #> 7 continent   categorical      NA       NA      NA         NA                  5
 #> 8 prout       categorical      NA       NA      NA         NA                  0
@@ -174,7 +238,7 @@ parameter. Here we will remove ‘continent’. It wont be available for
 filtereding/grouping and wont be fetched.
 
 ``` r
-run_app(
+demo_shinydbanalysis_app(
   pool = pool,
   storage_type = "local",
   column_info_dir = "column_info",
@@ -182,7 +246,7 @@ run_app(
 )
 ```
 
-## Building a Custom App (Diamond Analysis)
+# Building your own App (Diamond Analysis)
 
 For more control, you can build your own Shiny app using the package’s
 components. Here we build a custom app that will plot the diamond data
@@ -315,7 +379,7 @@ shinyApp(ui = ui, server = server)
 <figcaption aria-hidden="true">Diamond Analysis</figcaption>
 </figure>
 
-## Using Different Databases
+# Using Different Databases
 
 The package works with any database supported by dbplyr. Here are some
 connection examples:
@@ -348,7 +412,7 @@ create_column_info(
 )
 
 # Launch the app with explicit storage configuration
-run_app(
+demo_shinydbanalysis_app(
   pool = pool,
   storage_type = "local",
   column_info_dir = "column_info"

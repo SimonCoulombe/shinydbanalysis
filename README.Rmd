@@ -38,10 +38,14 @@ The {shinydbanalysis} offer the following modules you can use in your own apps:
 devtools::install_github("SimonCoulombe/shinydbanalysis")
 ```
 
-## Quick Start: Built-in App "run_app" with Example Data
+# Quick Start: Built-in App "demo_shinydbanalysis_app" with Example Data
 
-```{r, eval= FALSE}
 
+## Data prep for example  
+
+
+some pre-work to create the "column-_info" metadata and connect to a database
+```{r, eval = TRUE}
 library(shinydbanalysis)
 library(duckdb) # for local database example
 library(pool)
@@ -51,8 +55,9 @@ library(arrow) # we save as parquet files
 library(dplyr) 
 library(AzureStor) # we can save column info to ADLS directly instead of local hardrive for deployment on servers
 
-gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01"))) %>% filter(year >= 1990) %>% mutate(prout = NA_character_)
-# Create a DuckDB connection pool (in-memory database)
+gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01")))  %>% mutate(prout = NA_character_)
+# Create a DuckDB connection pool (in-memory database) 
+# this represents the SQL server you are going to connect to.
 pool <- dbPool(
   drv = duckdb::duckdb(),
   dbdir = ":memory:"
@@ -69,16 +74,14 @@ create_column_info("diamonds", pool)
 create_column_info("iris", pool)
 create_column_info("gapdata", pool)
 
-
-# Launch the app-
-# Local storage
-run_app(
+```
+##  Demo app (local storage type)   
+```{r, eval= FALSE}
+shinydbanalysis::demo_shinydbanalysis_app(
   pool = pool,
   storage_type = "local",
   column_info_dir = "column_info"
 )
-
-
 ```
 
 
@@ -92,8 +95,22 @@ Screenshot of the app in the "debug information" tab:
 
 ![Dataset Analysis Tool](man/figures/readme3.png)
 
+## Demo : Launch the all-in-one module Demo app (local storage type)   
 
-example code using ADLS 
+```{r, eval = FALSE}
+library(bslib)
+storage_info <- list(
+  storage_type = "local",
+  column_info_dir = "column_info"
+)
+restricted_columns <- character(0)
+demo_shinydbanalysis_app_all_in_one_module(pool, storage_info, restricted_columns)
+```
+
+## Demo: Use ADLS (azure data lake storage) to store column-info   
+
+ Useful if you are hosting you app on Posit Connect instead of locally.  
+
 ```{r,eval = FALSE}
 
 # ADLS version
@@ -107,25 +124,28 @@ shinydbanalysis::create_column_info(
   sas_token = Sys.getenv("sas_token_dev"))
 
 
-run_app(
-   pool = pool,
-   storage_type = "adls",
-   column_info_dir = "column_info", 
-   adls_endpoint = "https://myadlsenpoint.blob.core.windows.net/", 
-   adls_container =Sys.getenv("adls_container"),
-   sas_token = Sys.getenv("sas_token_dev"))
- )
+demo_shinydbanalysis_app(
+  pool = pool,
+  storage_type = "adls",
+  column_info_dir = "column_info", 
+  adls_endpoint = "https://myadlsenpoint.blob.core.windows.net/", 
+  adls_container =Sys.getenv("adls_container"),
+  sas_token = Sys.getenv("sas_token_dev"))
+)
 ```
 
-Below is the example of the content of the column_info parquet files :
+
+## column_info metadata 
+
+Here is an example of the content of the column_info parquet files :
 
 ```{r}
-library(shinydbanalysis)
+
 metadata_df <- read_column_info(
-    tablename = "gapdata",
-    storage_type = "local",
-    column_info_dir = "column_info"
-  )
+  tablename = "gapdata",
+  storage_type = "local",
+  column_info_dir = "column_info"
+)
 metadata_df
 ```
 
@@ -135,7 +155,7 @@ You may want to restrict the users from accessing certain columns without modify
 
 
 ```{r, eval = FALSE}
-run_app(
+demo_shinydbanalysis_app(
   pool = pool,
   storage_type = "local",
   column_info_dir = "column_info",
@@ -145,7 +165,7 @@ run_app(
 
 
 
-## Building a Custom App (Diamond Analysis)
+# Building your own App  (Diamond Analysis)
 
 For more control, you can build your own Shiny app using the package's components. Here we build a custom app that will plot the diamond data when it isnt grouped.
 
@@ -277,7 +297,7 @@ shinyApp(ui = ui, server = server)
 
 
 
-## Using Different Databases
+# Using Different Databases
 
 The package works with any database supported by dbplyr. Here are some connection examples:
 
@@ -309,7 +329,7 @@ create_column_info(
 )
 
 # Launch the app with explicit storage configuration
-run_app(
+demo_shinydbanalysis_app(
   pool = pool,
   storage_type = "local",
   column_info_dir = "column_info"
