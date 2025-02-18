@@ -102,14 +102,17 @@ filter_builder_server <- function(id, storage_info, selected_table, restricted_c
       mods <- state$modules
       current_states <- state$filter_states
       
-      for (mod_name in names(mods)) {
-        mod <- mods[[mod_name]]
-        value <- mod$instance$value()
-        if (!is.null(value)) {
-          current_states[[mod_name]] <- value
+      isolate({
+        for (mod_name in names(mods)) {
+          mod <- mods[[mod_name]]
+          value <- mod$instance$value()
+          if (!is.null(value)) {
+            current_states[[mod_name]] <- value
+          }
         }
-      }
-      state$filter_states <- current_states
+        state$filter_states <- current_states
+      })
+      
     })
     
     # Handle filter removal
