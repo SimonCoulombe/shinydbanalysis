@@ -203,6 +203,20 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
   })
 }
 
+#' demo_shinydbanalysis_app_all_in_one_module
+#'
+#' @param pool 
+#' @param storage_info 
+#' @param restricted_columns 
+#'
+#' @export
+#'
+#' @examples
+#' library(bslib)
+#' storage_info <- list(  storage_type = "local",column_info_dir = "column_info")
+#' restricted_columns <- character(0)
+#' demo_shinydbanalysis_app_all_in_one_module(pool, storage_info, restricted_columns)
+
 demo_shinydbanalysis_app_all_in_one_module <-function(pool, storage_info, restricted_columns){
 
   ui <- page_navbar(
