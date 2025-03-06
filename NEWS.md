@@ -1,7 +1,9 @@
 # shinydbanalysis 1.0.2  
-todo- - stop infinite loop in select table
-wider select table / sidebarsfor long table names 
-demo with module
+-stop infinite loop in select table
+-wider select table / sidebarsfor long table names 
+-demo with module
+-cleaner module input/output names  
+- data_fetcher doesnt ingest full modules outputs from table_picker, filter_builder, summary_builder to be a bit cleaner.
 
 
 # shinydbanalysis 1.0.1
