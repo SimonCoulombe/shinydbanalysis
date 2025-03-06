@@ -8,7 +8,8 @@ mod_navpanel_shinydbanalysis_ui <- function(id, title = "Input Data Explorer", w
         table_picker_ui(ns("table")),
         filter_builder_ui(ns("filters")),
         summary_builder_ui(ns("summaries")),
-        data_fetcher_ui(ns("fetcher"), style = "hover")
+        data_fetcher_ui(ns("fetcher"), style = "hover"),
+        width = 650
       ),
       navset_tab(
         nav_panel(
