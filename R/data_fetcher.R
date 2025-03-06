@@ -97,7 +97,15 @@ data_fetcher_ui <- function(id, style = "hover") {
 #' @param summary_builder Summary builder module instance
 #' @return List of reactive expressions
 #' @export
-data_fetcher_server <- function(id, pool, table_builder, filter_builder, summary_builder) {
+data_fetcher_server <- function(id, pool,# table_builder, filter_builder, summary_builder
+                                selected_table_name,
+                                selected_tbl_ref_without_restricted_columns,
+                                where_clause,
+                                needs_summary,
+                                group_vars,
+                                summary_specs
+                                
+                                ) {
   moduleServer(id, function(input, output, session) {
     # State management
     error_state <- reactiveVal(NULL)
@@ -106,10 +114,10 @@ data_fetcher_server <- function(id, pool, table_builder, filter_builder, summary
     
     # Warning message output
     output$warning_message <- renderUI({
-      req(table_builder$selected_table_name())
+      req(selected_table_name())
       
       # Only show warning if we're not summarizing
-      if (!summary_builder$needs_summary()) {
+      if (!needs_summary()) {
         div(
           class = "alert alert-warning",
           style = "margin-bottom: 10px;",
@@ -124,7 +132,7 @@ data_fetcher_server <- function(id, pool, table_builder, filter_builder, summary
     
     # Build query using dbplyr
     preview_query <- reactive({
-      table <- table_builder$selected_table_name()
+      table <- selected_table_name()
       
       if (is.null(table) || !nzchar(table)) {
         return(NULL)
@@ -132,27 +140,27 @@ data_fetcher_server <- function(id, pool, table_builder, filter_builder, summary
       
       tryCatch({
         # Get base table reference
-        query <- table_builder$selected_tbl_ref_without_restricted_columns()
+        query <- selected_tbl_ref_without_restricted_columns()
         
         # Apply filters if any
-        where_clause <- filter_builder$where_clause()
-        if (!is.null(where_clause) && nzchar(where_clause)) {
-          filter_expr <- parse_filter_expression(where_clause)
+        where_clause2 <- where_clause()
+        if (!is.null(where_clause2) && nzchar(where_clause2)) {
+          filter_expr <- parse_filter_expression(where_clause2)
           query <- filter(query, !!filter_expr)
         }
         
         # Only apply summarization if specifically requested
-        if (summary_builder$needs_summary()) {
+        if (needs_summary()) {
           # Get grouping variables if any
-          group_vars <- summary_builder$group_vars()
-          if (length(group_vars) > 0) {
-            query <- group_by(query, !!!syms(group_vars))
+          group_vars2 <- group_vars()
+          if (length(group_vars2) > 0) {
+            query <- group_by(query, !!!syms(group_vars2))
           }
           
           # Apply summary specifications
-          summary_specs <- summary_builder$summary_specs()
-          if (length(summary_specs) > 0) {
-            summary_exprs <- build_summary_expressions(summary_specs)
+          summary_specs2 <- summary_specs()
+          if (length(summary_specs2) > 0) {
+            summary_exprs <- build_summary_expressions(summary_specs2)
             if (length(summary_exprs) > 0) {
               query <- summarise(query, !!!summary_exprs)
             }

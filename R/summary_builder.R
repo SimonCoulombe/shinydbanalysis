@@ -152,9 +152,9 @@ summary_builder_server <- function(id, selected_table_name, column_info) {
     
     # Return interface
     list(
-      summary_specs = summary_specs,
-      group_vars = reactive(input$group_vars),
-      needs_summary = needs_summary
+      summary_specs = summary_specs,  #named list where each element has a metric, func and sql component 
+      group_vars = reactive(input$group_vars),  #  optional list of variables to group on
+      needs_summary = needs_summary  # boolean, indicating we need to generate a summary (count or other metrics  is selected)
     )
   })
 }

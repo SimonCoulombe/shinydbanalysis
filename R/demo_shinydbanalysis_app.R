@@ -144,9 +144,12 @@ demo_shinydbanalysis_app <- function(pool,
     fetched_data <- data_fetcher_server(
       "fetcher",
       pool = pool,
-      table_builder = table_results,
-      filter_builder = filter_results,
-      summary_builder = summary_results
+      selected_table_name = table_results$selected_table_name,
+      selected_tbl_ref_without_restricted_columns = table_results$selected_tbl_ref_without_restricted_columns,
+      where_clause = filter_results$where_clause,
+      needs_summary = summary_results$needs_summary,
+      group_vars  = summary_results$group_vars,
+      summary_specs = summary_results$summary_specs
     )
     
     plot_results <- plot_builder_server("plot", fetched_data)
