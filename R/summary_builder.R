@@ -69,16 +69,16 @@ summary_builder_ui <- function(id) {
 #' Create summary builder server
 #'
 #' @param id Character. The module ID
-#' @param selected_table Reactive. Selected table from table_picker
+#' @param selected_table_name Reactive. Selected table from table_picker
 #' @param column_info Reactive. Column info list containing metadata and distinct values
 #' @return List of reactive expressions containing summary specifications and grouping variables
 #' @export
-summary_builder_server <- function(id, selected_table, column_info) {
+summary_builder_server <- function(id, selected_table_name, column_info) {
   moduleServer(id, function(input, output, session) {
     
     # Update available columns when table changes
     observe({
-      req(selected_table(), column_info())
+      req(selected_table_name(), column_info())
       col_info <- column_info()
       
       # Get numeric columns from metadata for metrics
@@ -152,9 +152,9 @@ summary_builder_server <- function(id, selected_table, column_info) {
     
     # Return interface
     list(
-      summary_specs = summary_specs,
-      group_vars = reactive(input$group_vars),
-      needs_summary = needs_summary
+      summary_specs = summary_specs,  #named list where each element has a metric, func and sql component 
+      group_vars = reactive(input$group_vars),  #  optional list of variables to group on
+      needs_summary = needs_summary  # boolean, indicating we need to generate a summary (count or other metrics  is selected)
     )
   })
 }

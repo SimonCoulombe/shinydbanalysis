@@ -443,7 +443,7 @@ filterBuilderServer <- function(id, pool, allowed_tables) {
     return(list(
       filtered_data = filtered_data,
       current_filters = reactive(modules()),
-      selected_table = reactive(input$table_select)
+      selected_table_name = reactive(input$table_select)
     ))
   })
 }

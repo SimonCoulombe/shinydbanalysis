@@ -18,11 +18,11 @@ filter_builder_ui <- function(id) {
 #' Create filter builder server logic
 #' @param id Character. The module ID
 #' @param storage_info List with storage configuration
-#' @param selected_table Reactive. Selected table name
+#' @param selected_table_name Reactive. Selected table name
 #' @param restricted_columns Reactive. Columns to restrict
 #' @return List of reactive expressions
 #' @export
-filter_builder_server <- function(id, storage_info, selected_table, restricted_columns) {
+filter_builder_server <- function(id, storage_info, selected_table_name, restricted_columns) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
@@ -33,10 +33,10 @@ filter_builder_server <- function(id, storage_info, selected_table, restricted_c
     
     # Reactive for loading column info
     column_info <- reactive({
-      req(selected_table())
+      req(selected_table_name())
       
       info <- read_column_info(
-        tablename = selected_table(),
+        tablename = selected_table_name(),
         storage_type = storage_info$storage_type,
         column_info_dir = storage_info$column_info_dir,
         adls_endpoint = storage_info$adls_endpoint,
@@ -62,7 +62,7 @@ filter_builder_server <- function(id, storage_info, selected_table, restricted_c
     })
     
     # Clear filters when table changes
-    observeEvent(selected_table(), {
+    observeEvent(selected_table_name(), {
       state$filter_states <- list()
       removeUI(selector = paste0("#", ns("filters"), " > *"))
       state$modules <- list()
@@ -71,7 +71,7 @@ filter_builder_server <- function(id, storage_info, selected_table, restricted_c
     
     # Update available columns
     observe({
-      req(selected_table(), column_info())
+      req(selected_table_name(), column_info())
       col_info <- column_info()
       
       active_columns <- sapply(state$modules, function(mod) mod$instance$column)
@@ -142,7 +142,7 @@ filter_builder_server <- function(id, storage_info, selected_table, restricted_c
     
     # Render UI elements
     output$filters <- renderUI({
-      req(selected_table(), column_info())
+      req(selected_table_name(), column_info())
       mods <- state$modules
       states <- state$filter_states
       col_info <- column_info()

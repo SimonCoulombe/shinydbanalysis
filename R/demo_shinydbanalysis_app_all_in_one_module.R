@@ -32,8 +32,8 @@ mod_navpanel_shinydbanalysis_ui <- function(id, title = "Input Data Explorer", w
               div(class = "debug-section",
                   h4("table_picker_server returns:"),
                   tags$pre(
-                    "selected_table():",
-                    textOutput(ns("table_selected_table"), inline = TRUE)
+                    "selected_table_name():",
+                    textOutput(ns("table_selected_table_name"), inline = TRUE)
                   )
               ),
               
@@ -82,20 +82,20 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
   moduleServer( id, function(input, output, session){
     ns <- session$ns
     # Initialize modules
-    table_info <- table_picker_server("table", pool, storage_info, restricted_columns)
+    table_results <- table_picker_server("table", pool, storage_info, restricted_columns)
     
     filter_results <- filter_builder_server(
       "filters",
       storage_info = storage_info,
-      selected_table = table_info$selected_table,
+      selected_table_name = table_results$selected_table_name,
       restricted_columns = restricted_columns
     )
     
     # Get current column info reactively for summary builder
     current_column_info <- reactive({
-      req(table_info$selected_table())
+      req(table_results$selected_table_name())
       read_column_info(
-        tablename = table_info$selected_table(),
+        tablename = table_results$selected_table_name(),
         storage_type = storage_info$storage_type,
         column_info_dir = storage_info$column_info_dir,
         adls_endpoint = storage_info$adls_endpoint,
@@ -107,16 +107,19 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
     
     summary_results <- summary_builder_server(
       "summaries",
-      selected_table = table_info$selected_table,
+      selected_table_name = table_results$selected_table_name,
       column_info = current_column_info
     )
     
     fetched_data <- data_fetcher_server(
       "fetcher",
       pool = pool,
-      table_info = table_info,
-      filter_builder = filter_results,
-      summary_builder = summary_results
+      selected_table_name = table_results$selected_table_name,
+      selected_tbl_ref_without_restricted_columns = table_results$selected_tbl_ref_without_restricted_columns,
+      where_clause = filter_results$where_clause,
+      needs_summary = summary_results$needs_summary,
+      group_vars  = summary_results$group_vars,
+      summary_specs = summary_results$summary_specs
     )
     
     plot_results <- plot_builder_server("plot", fetched_data)
@@ -139,8 +142,8 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
     })
     
     # Debug outputs
-    output$table_selected_table <- renderText({
-      table_info$selected_table() %||% "NULL"
+    output$table_selected_table_name <- renderText({
+      table_results$selected_table_name() %||% "NULL"
     })
     
     output$filter_where_clause <- renderText({
