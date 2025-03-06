@@ -143,24 +143,21 @@ data_fetcher_server <- function(id, pool,# table_builder, filter_builder, summar
         query <- selected_tbl_ref_without_restricted_columns()
         
         # Apply filters if any
-        where_clause2 <- where_clause()
-        if (!is.null(where_clause2) && nzchar(where_clause2)) {
-          filter_expr <- parse_filter_expression(where_clause2)
+        if (!is.null(where_clause() ) && nzchar(where_clause())) {
+          filter_expr <- parse_filter_expression(where_clause())
           query <- filter(query, !!filter_expr)
         }
         
         # Only apply summarization if specifically requested
         if (needs_summary()) {
           # Get grouping variables if any
-          group_vars2 <- group_vars()
-          if (length(group_vars2) > 0) {
-            query <- group_by(query, !!!syms(group_vars2))
+          if (length(group_vars()) > 0) {
+            query <- group_by(query, !!!syms(group_vars()))
           }
           
           # Apply summary specifications
-          summary_specs2 <- summary_specs()
-          if (length(summary_specs2) > 0) {
-            summary_exprs <- build_summary_expressions(summary_specs2)
+          if (length(summary_specs()) > 0) {
+            summary_exprs <- build_summary_expressions(summary_specs())
             if (length(summary_exprs) > 0) {
               query <- summarise(query, !!!summary_exprs)
             }
