@@ -42,7 +42,7 @@ create_column_info <- function(tablename,
                                max_distinct_values = 300,
                                batch_size = 50) {
   
-  table_info <- parse_table_name(tablename)
+  parsed_table_name <- parse_table_name(tablename)
   
   # Input validation
   if (!is.character(tablename) || length(tablename) != 1) {
@@ -54,12 +54,12 @@ create_column_info <- function(tablename,
   }
   
   tryCatch({
-    if (!table_exists(pool, table_info)) {
+    if (!table_exists(pool, parsed_table_name)) {
       stop(sprintf("Table '%s' not found in database", tablename))
     }
     
     # Get table reference
-    tbl_ref <- create_table_ref(pool, table_info)
+    tbl_ref <- create_table_ref(pool, parsed_table_name)
     
     # Get column types from a single row
     message("Getting column types...")

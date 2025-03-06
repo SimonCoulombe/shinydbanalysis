@@ -15,15 +15,15 @@ parse_table_name <- function(full_table_name) {
 #' Create table reference using schema if present
 #'
 #' @param pool Database connection pool
-#' @param table_info List containing schema and table names
+#' @param parsed_table_name List containing schema and table names
 #' @return A dbplyr table reference
 #' @importFrom dplyr tbl
 #' @noRd
-create_table_ref <- function(pool, table_info) {
-  if (!is.null(table_info$schema)) {
-    tbl(pool, dbplyr::in_schema(table_info$schema, table_info$table))
+create_table_ref <- function(pool, parsed_table_name) {
+  if (!is.null(parsed_table_name$schema)) {
+    tbl(pool, dbplyr::in_schema(parsed_table_name$schema, parsed_table_name$table))
   } else {
-    tbl(pool, table_info$table)
+    tbl(pool, parsed_table_name$table)
   }
 }
 
@@ -90,16 +90,16 @@ table_picker_server <- function(id, pool, storage_info, restricted_columns = cha
         input$table_select != "",
         "Please select a valid table"
       ))
-      table_info(parse_table_name(input$table_select))
+      parsed_table_name(parse_table_name(input$table_select))
     })
     
     # Reactive value to store the selected table info
-    table_info <- reactiveVal(NULL)
+    parsed_table_name <- reactiveVal(NULL)
         
     # Create filtered table reference
     create_filtered_ref <- reactive({
-      req(table_info())
-      tbl_ref <- create_table_ref(pool, table_info())
+      req(parsed_table_name())
+      tbl_ref <- create_table_ref(pool, parsed_table_name())
       
       if (length(restricted_columns) > 0) {
         # Get all columns and filter out unavailable ones
@@ -114,7 +114,7 @@ table_picker_server <- function(id, pool, storage_info, restricted_columns = cha
     # Return interface with unavailable columns
     list(
       selected_table = reactive(input$table_select),
-      table_info = table_info,
+      parsed_table_name = parsed_table_name,
       create_table_ref = create_filtered_ref,
       restricted_columns = reactive(restricted_columns)
     )
@@ -151,8 +151,8 @@ get_available_tables <- function(storage_info, pool) {
   
   # Verify tables exist in database
   existing_tables <- sapply(table_names, function(name) {
-    table_info <- parse_table_name(name)
-    table_exists(pool, table_info)
+    parsed_table_name <- parse_table_name(name)
+    table_exists(pool, parsed_table_name)
   })
   
   available_tables <- table_names[existing_tables]
