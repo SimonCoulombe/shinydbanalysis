@@ -4,14 +4,14 @@
 \alias{data_fetcher_server}
 \title{Create data fetcher server logic}
 \usage{
-data_fetcher_server(id, pool, table_info, filter_builder, summary_builder)
+data_fetcher_server(id, pool, table_builder, filter_builder, summary_builder)
 }
 \arguments{
 \item{id}{Character. The module ID}
 
 \item{pool}{Database connection pool}
 
-\item{table_info}{Table picker module instance}
+\item{table_builder}{Table picker module instance}
 
 \item{filter_builder}{Filter builder module instance}
 

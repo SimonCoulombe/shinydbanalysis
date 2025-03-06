@@ -82,20 +82,20 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
   moduleServer( id, function(input, output, session){
     ns <- session$ns
     # Initialize modules
-    table_info <- table_picker_server("table", pool, storage_info, restricted_columns)
+    table_results <- table_picker_server("table", pool, storage_info, restricted_columns)
     
     filter_results <- filter_builder_server(
       "filters",
       storage_info = storage_info,
-      selected_table = table_info$selected_table,
+      selected_table = table_results$selected_table,
       restricted_columns = restricted_columns
     )
     
     # Get current column info reactively for summary builder
     current_column_info <- reactive({
-      req(table_info$selected_table())
+      req(table_results$selected_table())
       read_column_info(
-        tablename = table_info$selected_table(),
+        tablename = table_results$selected_table(),
         storage_type = storage_info$storage_type,
         column_info_dir = storage_info$column_info_dir,
         adls_endpoint = storage_info$adls_endpoint,
@@ -107,14 +107,14 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
     
     summary_results <- summary_builder_server(
       "summaries",
-      selected_table = table_info$selected_table,
+      selected_table = table_results$selected_table,
       column_info = current_column_info
     )
     
     fetched_data <- data_fetcher_server(
       "fetcher",
       pool = pool,
-      table_info = table_info,
+      table_builder = table_results,
       filter_builder = filter_results,
       summary_builder = summary_results
     )
@@ -140,7 +140,7 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
     
     # Debug outputs
     output$table_selected_table <- renderText({
-      table_info$selected_table() %||% "NULL"
+      table_results$selected_table() %||% "NULL"
     })
     
     output$filter_where_clause <- renderText({

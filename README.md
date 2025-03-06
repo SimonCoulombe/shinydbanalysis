@@ -311,13 +311,13 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   # Initialize modules with new storage configuration
-  table_info <- table_picker_server("table", pool, storage_info)
+  table_results <- table_picker_server("table", pool, storage_info)
   
   # Get current column info reactively
   current_column_info <- reactive({
-    req(table_info$selected_table())
+    req(table_results$selected_table())
     read_column_info(
-      tablename = table_info$selected_table(),
+      tablename = table_results$selected_table(),
       storage_type = storage_info$storage_type,
       column_info_dir = storage_info$column_info_dir
     )
@@ -326,12 +326,12 @@ server <- function(input, output, session) {
   filter_results <- filter_builder_server(
     "filters",
     storage_info = storage_info,
-    selected_table = table_info$selected_table
+    selected_table = table_results$selected_table
   )
   
   summary_results <- summary_builder_server(
     "summaries",
-    selected_table = table_info$selected_table,
+    selected_table = table_results$selected_table,
     column_info = current_column_info
   )
   
@@ -339,7 +339,7 @@ server <- function(input, output, session) {
   fetched_data <- data_fetcher_server(
     "fetcher",
     pool = pool,
-    table_info = table_info,
+    table_builder = table_results,
     filter_builder = filter_results,
     summary_builder = summary_results
   )

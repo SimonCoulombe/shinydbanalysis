@@ -92,12 +92,12 @@ data_fetcher_ui <- function(id, style = "hover") {
 #' Create data fetcher server logic
 #' @param id Character. The module ID
 #' @param pool Database connection pool
-#' @param table_info Table picker module instance
+#' @param table_builder Table picker module instance
 #' @param filter_builder Filter builder module instance
 #' @param summary_builder Summary builder module instance
 #' @return List of reactive expressions
 #' @export
-data_fetcher_server <- function(id, pool, table_info, filter_builder, summary_builder) {
+data_fetcher_server <- function(id, pool, table_builder, filter_builder, summary_builder) {
   moduleServer(id, function(input, output, session) {
     # State management
     error_state <- reactiveVal(NULL)
@@ -106,7 +106,7 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, summary_bu
     
     # Warning message output
     output$warning_message <- renderUI({
-      req(table_info$selected_table())
+      req(table_builder$selected_table())
       
       # Only show warning if we're not summarizing
       if (!summary_builder$needs_summary()) {
@@ -124,7 +124,7 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, summary_bu
     
     # Build query using dbplyr
     preview_query <- reactive({
-      table <- table_info$selected_table()
+      table <- table_builder$selected_table()
       
       if (is.null(table) || !nzchar(table)) {
         return(NULL)
@@ -132,7 +132,7 @@ data_fetcher_server <- function(id, pool, table_info, filter_builder, summary_bu
       
       tryCatch({
         # Get base table reference
-        query <- table_info$create_table_ref()
+        query <- table_builder$create_table_ref()
         
         # Apply filters if any
         where_clause <- filter_builder$where_clause()
