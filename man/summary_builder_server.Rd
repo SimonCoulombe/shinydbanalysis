@@ -4,12 +4,12 @@
 \alias{summary_builder_server}
 \title{Create summary builder server}
 \usage{
-summary_builder_server(id, selected_table, column_info)
+summary_builder_server(id, selected_table_name, column_info)
 }
 \arguments{
 \item{id}{Character. The module ID}
 
-\item{selected_table}{Reactive. Selected table from table_picker}
+\item{selected_table_name}{Reactive. Selected table from table_picker}
 
 \item{column_info}{Reactive. Column info list containing metadata and distinct values}
 }

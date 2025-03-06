@@ -83,6 +83,9 @@ table_picker_server <- function(id, pool, storage_info, restricted_columns = cha
       }
     })
     
+    # Reactive value to store the selected table info
+    selected_parsed_table_name <- reactiveVal(NULL)
+    
     # Observe changes to the table selection input
     observeEvent(input$table_select, {
       req(input$table_select)
@@ -90,16 +93,15 @@ table_picker_server <- function(id, pool, storage_info, restricted_columns = cha
         input$table_select != "",
         "Please select a valid table"
       ))
-      parsed_table_name(parse_table_name(input$table_select))
+      selected_parsed_table_name(parse_table_name(input$table_select))
     })
     
-    # Reactive value to store the selected table info
-    parsed_table_name <- reactiveVal(NULL)
+
         
-    # Create filtered table reference
-    create_filtered_ref <- reactive({
-      req(parsed_table_name())
-      tbl_ref <- create_table_ref(pool, parsed_table_name())
+    # Create table reference without restricted columns
+    selected_tbl_ref_without_restricted_columns <- reactive({
+      req(selected_parsed_table_name())
+      tbl_ref <- create_table_ref(pool, selected_parsed_table_name())
       
       if (length(restricted_columns) > 0) {
         # Get all columns and filter out unavailable ones
@@ -113,10 +115,9 @@ table_picker_server <- function(id, pool, storage_info, restricted_columns = cha
     
     # Return interface with unavailable columns
     list(
-      selected_table = reactive(input$table_select),
-      parsed_table_name = parsed_table_name,
-      create_table_ref = create_filtered_ref,
-      restricted_columns = reactive(restricted_columns)
+      selected_table_name = reactive(input$table_select),
+      selected_parsed_table_name = selected_parsed_table_name,
+      selected_tbl_ref_without_restricted_columns = selected_tbl_ref_without_restricted_columns
     )
   })
 }

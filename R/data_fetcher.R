@@ -106,7 +106,7 @@ data_fetcher_server <- function(id, pool, table_builder, filter_builder, summary
     
     # Warning message output
     output$warning_message <- renderUI({
-      req(table_builder$selected_table())
+      req(table_builder$selected_table_name())
       
       # Only show warning if we're not summarizing
       if (!summary_builder$needs_summary()) {
@@ -124,7 +124,7 @@ data_fetcher_server <- function(id, pool, table_builder, filter_builder, summary
     
     # Build query using dbplyr
     preview_query <- reactive({
-      table <- table_builder$selected_table()
+      table <- table_builder$selected_table_name()
       
       if (is.null(table) || !nzchar(table)) {
         return(NULL)
@@ -132,7 +132,7 @@ data_fetcher_server <- function(id, pool, table_builder, filter_builder, summary
       
       tryCatch({
         # Get base table reference
-        query <- table_builder$create_table_ref()
+        query <- table_builder$selected_tbl_ref_without_restricted_columns()
         
         # Apply filters if any
         where_clause <- filter_builder$where_clause()

@@ -315,9 +315,9 @@ server <- function(input, output, session) {
   
   # Get current column info reactively
   current_column_info <- reactive({
-    req(table_results$selected_table())
+    req(table_results$selected_table_name())
     read_column_info(
-      tablename = table_results$selected_table(),
+      tablename = table_results$selected_table_name(),
       storage_type = storage_info$storage_type,
       column_info_dir = storage_info$column_info_dir
     )
@@ -326,12 +326,12 @@ server <- function(input, output, session) {
   filter_results <- filter_builder_server(
     "filters",
     storage_info = storage_info,
-    selected_table = table_results$selected_table
+    selected_table_name = table_results$selected_table_name
   )
   
   summary_results <- summary_builder_server(
     "summaries",
-    selected_table = table_results$selected_table,
+    selected_table_name = table_results$selected_table_name,
     column_info = current_column_info
   )
   

@@ -32,8 +32,8 @@ mod_navpanel_shinydbanalysis_ui <- function(id, title = "Input Data Explorer", w
               div(class = "debug-section",
                   h4("table_picker_server returns:"),
                   tags$pre(
-                    "selected_table():",
-                    textOutput(ns("table_selected_table"), inline = TRUE)
+                    "selected_table_name():",
+                    textOutput(ns("table_selected_table_name"), inline = TRUE)
                   )
               ),
               
@@ -87,15 +87,15 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
     filter_results <- filter_builder_server(
       "filters",
       storage_info = storage_info,
-      selected_table = table_results$selected_table,
+      selected_table_name = table_results$selected_table_name,
       restricted_columns = restricted_columns
     )
     
     # Get current column info reactively for summary builder
     current_column_info <- reactive({
-      req(table_results$selected_table())
+      req(table_results$selected_table_name())
       read_column_info(
-        tablename = table_results$selected_table(),
+        tablename = table_results$selected_table_name(),
         storage_type = storage_info$storage_type,
         column_info_dir = storage_info$column_info_dir,
         adls_endpoint = storage_info$adls_endpoint,
@@ -107,7 +107,7 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
     
     summary_results <- summary_builder_server(
       "summaries",
-      selected_table = table_results$selected_table,
+      selected_table_name = table_results$selected_table_name,
       column_info = current_column_info
     )
     
@@ -139,8 +139,8 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
     })
     
     # Debug outputs
-    output$table_selected_table <- renderText({
-      table_results$selected_table() %||% "NULL"
+    output$table_selected_table_name <- renderText({
+      table_results$selected_table_name() %||% "NULL"
     })
     
     output$filter_where_clause <- renderText({
