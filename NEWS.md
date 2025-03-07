@@ -1,3 +1,6 @@
+# shindbanalysis 1.0.3   
+
+- split data_fetcher into query_builder and data_fetcher
 # shinydbanalysis 1.0.2  
 -stop infinite loop in select table
 -wider select table / sidebarsfor long table names 
