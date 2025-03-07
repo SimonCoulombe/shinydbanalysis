@@ -4,27 +4,16 @@
 \alias{data_fetcher_server}
 \title{Create data fetcher server logic}
 \usage{
-data_fetcher_server(
-  id,
-  pool,
-  selected_table_name,
-  selected_tbl_ref_without_restricted_columns,
-  where_clause,
-  needs_summary,
-  group_vars,
-  summary_specs
-)
+data_fetcher_server(id, pool, query, needs_summary)
 }
 \arguments{
 \item{id}{Character. The module ID}
 
 \item{pool}{Database connection pool}
 
-\item{table_builder}{Table picker module instance}
+\item{query}{Reactive expression for the built query}
 
-\item{filter_builder}{Filter builder module instance}
-
-\item{summary_builder}{Summary builder module instance}
+\item{needs_summary}{Reactive expression for needs summary flag}
 }
 \value{
 List of reactive expressions

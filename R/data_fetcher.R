@@ -89,23 +89,15 @@ data_fetcher_ui <- function(id, style = "hover") {
   }
 }
 
+
 #' Create data fetcher server logic
 #' @param id Character. The module ID
 #' @param pool Database connection pool
-#' @param table_builder Table picker module instance
-#' @param filter_builder Filter builder module instance
-#' @param summary_builder Summary builder module instance
+#' @param query Reactive expression for the built query
+#' @param needs_summary Reactive expression for needs summary flag
 #' @return List of reactive expressions
 #' @export
-data_fetcher_server <- function(id, pool,# table_builder, filter_builder, summary_builder
-                                selected_table_name,
-                                selected_tbl_ref_without_restricted_columns,
-                                where_clause,
-                                needs_summary,
-                                group_vars,
-                                summary_specs
-                                
-                                ) {
+data_fetcher_server <- function(id, pool, query, needs_summary) {
   moduleServer(id, function(input, output, session) {
     # State management
     error_state <- reactiveVal(NULL)
@@ -114,7 +106,7 @@ data_fetcher_server <- function(id, pool,# table_builder, filter_builder, summar
     
     # Warning message output
     output$warning_message <- renderUI({
-      req(selected_table_name())
+      req(query())
       
       # Only show warning if we're not summarizing
       if (!needs_summary()) {
@@ -130,8 +122,70 @@ data_fetcher_server <- function(id, pool,# table_builder, filter_builder, summar
       }
     })
     
+    # Show preview query
+    output$query_preview <- renderPrint({
+      cat(get_sql_text(query()))
+    })
+    
+    # Execute query when fetch button is clicked
+    observeEvent(input$fetch_data, {
+      query_val <- query()
+      
+      if (is.null(query_val)) {
+        fetched_data(NULL)
+        executed_query("")
+        return()
+      }
+      
+      tryCatch({
+        # Store the SQL that's about to be executed
+        executed_query(get_sql_text(query_val))
+        
+        # Execute query with progress indicator
+        withProgress(
+          message = 'Fetching data...',
+          {
+            result <- collect(query_val)
+            fetched_data(result)
+            error_state(NULL)
+          }
+        )
+        
+      }, error = function(e) {
+        error_state(paste("Error executing query:", e$message))
+        fetched_data(NULL)
+        executed_query("")
+      })
+    })
+    
+    # Return interface
+    list(
+      data = reactive(fetched_data()),
+      error = reactive(error_state()),
+      executed_query = reactive(executed_query())
+    )
+  })
+}
+
+
+#' Create query builder server logic
+#' @param id Character. The module ID
+#' @param pool Database connection pool
+#' @param selected_table_name Reactive expression for selected table name
+#' @param selected_tbl_ref_without_restricted_columns Reactive expression for table reference without restricted columns
+#' @param where_clause Reactive expression for where clause
+#' @param needs_summary Reactive expression for needs summary flag
+#' @param group_vars Reactive expression for group variables
+#' @param summary_specs Reactive expression for summary specifications
+#' @return List containing reactive expressions for the built query and needs_summary
+#' @export
+query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref_without_restricted_columns, where_clause, needs_summary, group_vars, summary_specs) {
+  moduleServer(id, function(input, output, session) {
+    # State management
+    error_state <- reactiveVal(NULL)
+    
     # Build query using dbplyr
-    preview_query <- reactive({
+    query <- reactive({
       table <- selected_table_name()
       
       if (is.null(table) || !nzchar(table)) {
@@ -172,54 +226,11 @@ data_fetcher_server <- function(id, pool,# table_builder, filter_builder, summar
       })
     })
     
-    # Create preview text
-    preview_text <- reactive({
-      query <- preview_query()
-      get_sql_text(query)
-    })
-    
-    # Show preview query
-    output$query_preview <- renderPrint({
-      cat(preview_text())
-    })
-    
-    # Execute query when fetch button is clicked
-    observeEvent(input$fetch_data, {
-      query <- preview_query()
-      
-      if (is.null(query)) {
-        fetched_data(NULL)
-        executed_query("")
-        return()
-      }
-      
-      tryCatch({
-        # Store the SQL that's about to be executed
-        executed_query(get_sql_text(query))
-        
-        # Execute query with progress indicator
-        withProgress(
-          message = 'Fetching data...',
-          {
-            result <- collect(query)
-            fetched_data(result)
-            error_state(NULL)
-          }
-        )
-        
-      }, error = function(e) {
-        error_state(paste("Error executing query:", e$message))
-        fetched_data(NULL)
-        executed_query("")
-      })
-    })
-    
     # Return interface
     list(
-      data = reactive(fetched_data()),
-      error = reactive(error_state()),
-      executed_query = reactive(executed_query()),
-      preview_query = reactive(preview_text())
+      query = reactive(query()),
+      needs_summary = reactive(needs_summary()),
+      error = reactive(error_state())
     )
   })
 }
