@@ -111,8 +111,8 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
       column_info = current_column_info
     )
     
-    fetched_data <- data_fetcher_server(
-      "fetcher",
+    query_results <- query_builder_server(
+      "query_builder",
       pool = pool,
       selected_table_name = table_results$selected_table_name,
       selected_tbl_ref_without_restricted_columns = table_results$selected_tbl_ref_without_restricted_columns,
@@ -120,6 +120,12 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
       needs_summary = summary_results$needs_summary,
       group_vars  = summary_results$group_vars,
       summary_specs = summary_results$summary_specs
+    )
+    
+    fetched_data <- data_fetcher_server(
+      "fetcher",
+      pool = pool,
+      query = query_results$query
     )
     
     plot_results <- plot_builder_server("plot", fetched_data)
