@@ -94,20 +94,44 @@ data_fetcher_ui <- function(id, style = "hover") {
 #' @param id Character. The module ID
 #' @param pool Database connection pool
 #' @param query Reactive expression for the built query
+#' @param needs_summary Reactive expression for needs summary flag
 #' @return List of reactive expressions
 #' @export
-data_fetcher_server <- function(id, pool, query) {
+data_fetcher_server <- function(id, pool, query, needs_summary) {
   moduleServer(id, function(input, output, session) {
     # State management
     error_state <- reactiveVal(NULL)
     fetched_data <- reactiveVal(NULL)
     executed_query <- reactiveVal("")
     
+    # Warning message output
+    output$warning_message <- renderUI({
+      req(query())
+      
+      # Only show warning if we're not summarizing
+      if (!needs_summary()) {
+        div(
+          class = "alert alert-warning",
+          style = "margin-bottom: 10px;",
+          icon("exclamation-triangle"),
+          tags$b("Warning: "),
+          "Fetching all data without summarization may take a while.",
+          tags$br(),
+          "Consider using summary statistics if you don't need individual records."
+        )
+      }
+    })
+    
+    # Show preview query
+    output$query_preview <- renderPrint({
+      cat(get_sql_text(query()))
+    })
+    
     # Execute query when fetch button is clicked
     observeEvent(input$fetch_data, {
-      query <- query()
+      query_val <- query()
       
-      if (is.null(query)) {
+      if (is.null(query_val)) {
         fetched_data(NULL)
         executed_query("")
         return()
@@ -115,13 +139,13 @@ data_fetcher_server <- function(id, pool, query) {
       
       tryCatch({
         # Store the SQL that's about to be executed
-        executed_query(get_sql_text(query))
+        executed_query(get_sql_text(query_val))
         
         # Execute query with progress indicator
         withProgress(
           message = 'Fetching data...',
           {
-            result <- collect(query)
+            result <- collect(query_val)
             fetched_data(result)
             error_state(NULL)
           }
@@ -153,7 +177,7 @@ data_fetcher_server <- function(id, pool, query) {
 #' @param needs_summary Reactive expression for needs summary flag
 #' @param group_vars Reactive expression for group variables
 #' @param summary_specs Reactive expression for summary specifications
-#' @return Reactive expression for the built query
+#' @return List containing reactive expressions for the built query and needs_summary
 #' @export
 query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref_without_restricted_columns, where_clause, needs_summary, group_vars, summary_specs) {
   moduleServer(id, function(input, output, session) {
@@ -205,6 +229,7 @@ query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref
     # Return interface
     list(
       query = reactive(query()),
+      needs_summary = reactive(needs_summary()),
       error = reactive(error_state())
     )
   })

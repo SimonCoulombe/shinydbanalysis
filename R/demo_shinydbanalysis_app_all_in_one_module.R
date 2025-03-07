@@ -125,7 +125,8 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
     fetched_data <- data_fetcher_server(
       "fetcher",
       pool = pool,
-      query = query_results$query
+      query = query_results$query,
+      needs_summary = query_results$needs_summary
     )
     
     plot_results <- plot_builder_server("plot", fetched_data)
@@ -228,16 +229,16 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
 #' demo_shinydbanalysis_app_all_in_one_module(pool, storage_info, restricted_columns)
 
 demo_shinydbanalysis_app_all_in_one_module <-function(pool, storage_info, restricted_columns){
-
+  
   ui <- page_navbar(
     title = "Dataset Analysis Tool",
     mod_navpanel_shinydbanalysis_ui("x")
   )
-
+  
   server <- function(input, output, session){
     mod_navpanel_shinydbanalysis_server("x",pool, storage_info, restricted_columns)
   }
   shiny::shinyApp(ui, server)
-
+  
 }
 #demo_shinydbanalysis_app_all_in_one_module()
