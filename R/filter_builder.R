@@ -93,7 +93,8 @@ filter_builder_server <- function(id, storage_info, selected_table_name, restric
       col_info <- column_info()
       
       col_metadata <- col_info$metadata %>%
-        filter(column_name == input$add_filter)
+        filter(column_name == input$add_filter) %>%
+        as.list()  # Convert to list so metadata$column_type returns a single value
       
       add_new_filter(input$add_filter, state, col_metadata, col_info$distinct_values, session)
       updateSelectInput(session, "add_filter", selected = "")
@@ -154,7 +155,8 @@ filter_builder_server <- function(id, storage_info, selected_table_name, restric
         col_name <- mods[[id]]$instance$column
         
         col_metadata <- col_info$metadata %>%
-          filter(column_name == col_name)
+          filter(column_name == col_name) %>%
+          as.list()  # Convert to list so metadata$column_type returns a single value
         
         filter_module_ui(
           full_id, 
