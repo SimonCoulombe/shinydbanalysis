@@ -1,3 +1,8 @@
+# shindbanalysis 1.0.4   
+in filter_builder_server, the observeEvent doesnt clear the dropdown when changing the selected table name anymore.  the reason:
+sometimes the observe() that maintains the filter (based on selected_table_name, but also the created filters) would populate the list first, then the observeEvent would clear the tables.
+
+
 # shindbanalysis 1.0.3   
 
 - split data_fetcher into query_builder and data_fetcher

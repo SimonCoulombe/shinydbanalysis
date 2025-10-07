@@ -33,6 +33,7 @@ filter_builder_server <- function(id, storage_info, selected_table_name, restric
     
     # Reactive for loading column info
     column_info <- reactive({
+      message("[filter_builder] column_info reactive evaluating, selected_table = ", selected_table_name())
       req(selected_table_name())
       
       info <- read_column_info(
@@ -46,7 +47,8 @@ filter_builder_server <- function(id, storage_info, selected_table_name, restric
       
       # Filter out unavailable columns
       restricted_cols <- if (is.reactive(restricted_columns)) {
-        restricted_columns()
+        result <- restricted_columns()
+        result
       } else {
         restricted_columns
       }
@@ -57,27 +59,27 @@ filter_builder_server <- function(id, storage_info, selected_table_name, restric
         info$distinct_values <- info$distinct_values %>%
           filter(!column_name %in% restricted_cols)
       }
-      
       info
     })
     
     # Clear filters when table changes
     observeEvent(selected_table_name(), {
+      message("[filter_builder] observeEvent Clear Filters: selected_table_name changed to: ", selected_table_name(),)
       state$filter_states <- list()
       removeUI(selector = paste0("#", ns("filters"), " > *"))
       state$modules <- list()
-      updateSelectInput(session, "add_filter", choices = c("Select column" = ""))
+      # REMOVED: Don't clear dropdown here - let the observe block handle it
+      # updateSelectInput(session, "add_filter", choices = c("Select column" = ""))
     }, ignoreInit = TRUE)
     
     # Update available columns
     observe({
+      message("[filter_builder] observe updating available columns")
       req(selected_table_name(), column_info())
       col_info <- column_info()
-      
       active_columns <- sapply(state$modules, function(mod) mod$instance$column)
       all_columns <- col_info$metadata$column_name
       available_columns <- setdiff(all_columns, active_columns)
-      
       updateSelectInput(
         session,
         "add_filter",
