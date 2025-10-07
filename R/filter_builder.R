@@ -64,7 +64,7 @@ filter_builder_server <- function(id, storage_info, selected_table_name, restric
     
     # Clear filters when table changes
     observeEvent(selected_table_name(), {
-      message("[filter_builder] observeEvent Clear Filters: selected_table_name changed to: ", selected_table_name(),)
+      message("[filter_builder] observeEvent Clear Filters: selected_table_name changed to: ", selected_table_name())
       state$filter_states <- list()
       removeUI(selector = paste0("#", ns("filters"), " > *"))
       state$modules <- list()
