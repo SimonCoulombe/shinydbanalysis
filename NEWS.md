@@ -1,3 +1,6 @@
+# shindbanalysis 1.0.7
+broke down summary_builder into group_builder and summary_builder
+
 # shindbanalysis 1.0.6
 we can now group categorical variables on the fly.
 
