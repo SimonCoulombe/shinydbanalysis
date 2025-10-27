@@ -1,6 +1,6 @@
 Package: shinydbanalysis
 Title: A database-agnostic Shiny-based tool for filtering, grouping, and summarizing database tables.
-Version: 1.0.4
+Version: 1.0.5
 Authors@R: 
     person("Simon", "Coulombe", , "first.last@example.com", role = c("aut", "cre"))
 Description: A Shiny-based tool for filtering, grouping, and summarizing database tables.

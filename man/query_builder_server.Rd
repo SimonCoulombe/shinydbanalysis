@@ -12,7 +12,8 @@ query_builder_server(
   where_clause,
   needs_summary,
   group_vars,
-  summary_specs
+  summary_specs,
+  banding_configs = NULL
 )
 }
 \arguments{
@@ -28,9 +29,11 @@ query_builder_server(
 
 \item{needs_summary}{Reactive expression for needs summary flag}
 
-\item{group_vars}{Reactive expression for group variables}
+\item{group_vars}{Reactive expression for grouping variables}
 
 \item{summary_specs}{Reactive expression for summary specifications}
+
+\item{banding_configs}{Reactive expression for numeric banding configurations}
 }
 \value{
 List containing reactive expressions for the built query and needs_summary
