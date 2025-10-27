@@ -119,7 +119,8 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
       where_clause = filter_results$where_clause,
       needs_summary = summary_results$needs_summary,
       group_vars  = summary_results$group_vars,
-      summary_specs = summary_results$summary_specs
+      summary_specs = summary_results$summary_specs,
+      banding_configs = summary_results$banding_configs
     )
     
     fetched_data <- data_fetcher_server(

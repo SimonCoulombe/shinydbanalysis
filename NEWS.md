@@ -1,3 +1,7 @@
+# shindbanalysis 1.0.5
+We can now group on numeric variables by creating "bandings on the fly"
+
+
 # shindbanalysis 1.0.4   
 in filter_builder_server, the observeEvent doesnt clear the dropdown when changing the selected table name anymore.  the reason:
 sometimes the observe() that maintains the filter (based on selected_table_name, but also the created filters) would populate the list first, then the observeEvent would clear the tables.

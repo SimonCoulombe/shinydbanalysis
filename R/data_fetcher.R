@@ -177,9 +177,12 @@ data_fetcher_server <- function(id, pool, query, needs_summary) {
 #' @param needs_summary Reactive expression for needs summary flag
 #' @param group_vars Reactive expression for group variables
 #' @param summary_specs Reactive expression for summary specifications
+#' @param group_vars Reactive expression for grouping variables
+#' @param summary_specs Reactive expression for summary specifications
+#' @param banding_configs Reactive expression for numeric banding configurations
 #' @return List containing reactive expressions for the built query and needs_summary
 #' @export
-query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref_without_restricted_columns, where_clause, needs_summary, group_vars, summary_specs) {
+query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref_without_restricted_columns, where_clause, needs_summary, group_vars, summary_specs, banding_configs = NULL) {
   moduleServer(id, function(input, output, session) {
     # State management
     error_state <- reactiveVal(NULL)
@@ -200,6 +203,15 @@ query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref
         if (!is.null(where_clause() ) && nzchar(where_clause())) {
           filter_expr <- parse_filter_expression(where_clause())
           query <- filter(query, !!filter_expr)
+        }
+        
+        # Apply banding transformations before grouping
+        if (!is.null(banding_configs) && length(banding_configs()) > 0) {
+          for (var_name in names(banding_configs())) {
+            config <- banding_configs()[[var_name]]
+            band_expr <- create_banding_expression(var_name, config)
+            query <- mutate(query, !!sym(var_name) := !!band_expr)
+          }
         }
         
         # Only apply summarization if specifically requested
@@ -286,4 +298,29 @@ build_summary_expressions <- function(summary_specs) {
   }
   
   summary_exprs
+}
+
+#' Create banding expression for numeric variables
+#' @param var_name Character string with the variable name
+#' @param config List with breaks and labels
+#' @return Quoted expression for case_when
+#' @noRd
+create_banding_expression <- function(var_name, config) {
+  breaks <- config$breaks
+  labels <- config$labels
+  n <- length(breaks)
+  
+  conditions <- list()
+  
+  conditions[[1]] <- quo(!!sym(var_name) < !!breaks[1] ~ !!labels[1])
+  
+  if (n > 1) {
+    for (i in seq_len(n - 1)) {
+      conditions[[i + 1]] <- quo(!!sym(var_name) >= !!breaks[i] & !!sym(var_name) < !!breaks[i + 1] ~ !!labels[i + 1])
+    }
+  }
+  
+  conditions[[n + 1]] <- quo(!!sym(var_name) >= !!breaks[n] ~ !!labels[n + 1])
+  
+  quo(case_when(!!!conditions))
 }
