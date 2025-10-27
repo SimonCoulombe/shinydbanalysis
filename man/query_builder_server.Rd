@@ -13,7 +13,8 @@ query_builder_server(
   needs_summary,
   group_vars,
   summary_specs,
-  banding_configs = NULL
+  banding_configs = NULL,
+  regrouping_configs = NULL
 )
 }
 \arguments{
@@ -34,6 +35,8 @@ query_builder_server(
 \item{summary_specs}{Reactive expression for summary specifications}
 
 \item{banding_configs}{Reactive expression for numeric banding configurations}
+
+\item{regrouping_configs}{Reactive expression for categorical regrouping configurations}
 }
 \value{
 List containing reactive expressions for the built query and needs_summary

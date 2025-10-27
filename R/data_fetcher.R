@@ -180,9 +180,10 @@ data_fetcher_server <- function(id, pool, query, needs_summary) {
 #' @param group_vars Reactive expression for grouping variables
 #' @param summary_specs Reactive expression for summary specifications
 #' @param banding_configs Reactive expression for numeric banding configurations
+#' @param regrouping_configs Reactive expression for categorical regrouping configurations
 #' @return List containing reactive expressions for the built query and needs_summary
 #' @export
-query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref_without_restricted_columns, where_clause, needs_summary, group_vars, summary_specs, banding_configs = NULL) {
+query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref_without_restricted_columns, where_clause, needs_summary, group_vars, summary_specs, banding_configs = NULL, regrouping_configs = NULL) {
   moduleServer(id, function(input, output, session) {
     # State management
     error_state <- reactiveVal(NULL)
@@ -211,6 +212,15 @@ query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref
             config <- banding_configs()[[var_name]]
             band_expr <- create_banding_expression(var_name, config)
             query <- mutate(query, !!sym(var_name) := !!band_expr)
+          }
+        }
+        
+        # Apply regrouping transformations before grouping
+        if (!is.null(regrouping_configs) && length(regrouping_configs()) > 0) {
+          for (var_name in names(regrouping_configs())) {
+            config <- regrouping_configs()[[var_name]]
+            regroup_expr <- create_regrouping_expression(var_name, config)
+            query <- mutate(query, !!sym(var_name) := !!regroup_expr)
           }
         }
         
@@ -321,6 +331,44 @@ create_banding_expression <- function(var_name, config) {
   }
   
   conditions[[n + 1]] <- quo(!!sym(var_name) >= !!breaks[n] ~ !!labels[n + 1])
+  
+  quo(case_when(!!!conditions))
+}
+
+#' Create regrouping expression for categorical variables
+#' @param var_name Character string with the variable name
+#' @param config List with mapping and group_unmapped_as_other flag
+#' @return Quoted expression for case_when
+#' @noRd
+create_regrouping_expression <- function(var_name, config) {
+  # Handle legacy format (plain mapping) or new format (list with mapping + flag)
+  if (is.null(config$mapping)) {
+    # Legacy format: config is the mapping itself
+    mapping <- config
+    group_unmapped_as_other <- FALSE
+  } else {
+    # New format: config has mapping and group_unmapped_as_other
+    mapping <- config$mapping
+    group_unmapped_as_other <- isTRUE(config$group_unmapped_as_other)
+  }
+  
+  if (length(mapping) == 0) {
+    return(quo(!!sym(var_name)))
+  }
+  
+  conditions <- list()
+  
+  for (original_value in names(mapping)) {
+    new_group <- mapping[[original_value]]
+    conditions[[length(conditions) + 1]] <- quo(!!sym(var_name) == !!original_value ~ !!new_group)
+  }
+  
+  # Add a default case: either "Other" or keep original values
+  if (group_unmapped_as_other) {
+    conditions[[length(conditions) + 1]] <- quo(TRUE ~ "Other")
+  } else {
+    conditions[[length(conditions) + 1]] <- quo(TRUE ~ !!sym(var_name))
+  }
   
   quo(case_when(!!!conditions))
 }
