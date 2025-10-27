@@ -1,3 +1,6 @@
+# shindbanalysis 1.0.6
+we can now group categorical variables on the fly.
+
 # shindbanalysis 1.0.5
 We can now group on numeric variables by creating "bandings on the fly"
 

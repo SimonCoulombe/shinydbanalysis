@@ -149,7 +149,8 @@ demo_shinydbanalysis_app <- function(pool,
       needs_summary = summary_results$needs_summary,
       group_vars  = summary_results$group_vars,
       summary_specs = summary_results$summary_specs,
-      banding_configs = summary_results$banding_configs
+      banding_configs = summary_results$banding_configs,
+      regrouping_configs = summary_results$regrouping_configs
     )
     
     fetched_data <- data_fetcher_server(
