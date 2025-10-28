@@ -27,10 +27,17 @@ group_builder_ui <- function(id) {
 #' @param id Character. The module ID
 #' @param selected_table_name Reactive. Selected table from table_picker
 #' @param column_info Reactive. Column info list containing metadata and distinct values
-#' @param acceptable_dimensions Optional reactive or character vector. If provided, restricts groupable columns to this list
+#' @param acceptable_dimensions Optional reactive. If provided, restricts groupable columns to this list
 #' @return List of reactive expressions containing grouping variables, banding configs, and regrouping configs
 #' @export
 group_builder_server <- function(id, selected_table_name, column_info, acceptable_dimensions = NULL) {
+  
+  stopifnot(is.reactive(selected_table_name))
+  stopifnot(is.reactive(column_info))
+  if (!is.null(acceptable_dimensions)) {
+    stopifnot(is.reactive(acceptable_dimensions))
+  }
+  
   moduleServer(id, function(input, output, session) {
     
     observe({
@@ -40,14 +47,8 @@ group_builder_server <- function(id, selected_table_name, column_info, acceptabl
       groupable_cols <- col_info$metadata %>%
         pull(.data$column_name)
       
-      # Apply acceptable_dimensions filter if provided
       if (!is.null(acceptable_dimensions)) {
-        acceptable_dims <- if (is.reactive(acceptable_dimensions)) {
-          acceptable_dimensions()
-        } else {
-          acceptable_dimensions
-        }
-        
+        acceptable_dims <- acceptable_dimensions()
         if (!is.null(acceptable_dims) && length(acceptable_dims) > 0) {
           groupable_cols <- intersect(groupable_cols, acceptable_dims)
         }
