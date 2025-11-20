@@ -214,7 +214,7 @@ build_where_clauses <- function(modules) {
   if (length(modules) == 0) return(character(0))
   
   filters <- lapply(modules, function(mod) {
-    build_filter_expression(
+    build_single_filter_expression(
       mod$instance$column,
       mod$instance$type,
       mod$instance$value()

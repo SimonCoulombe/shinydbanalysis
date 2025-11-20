@@ -226,7 +226,7 @@ single_filter_demo <- function() {
       cat("$is_active():", numeric_result$is_active(), "\n")
       cat("$remove():", if(is.null(numeric_result$remove())) 0 else numeric_result$remove(), "\n\n")
       
-      expr <- build_filter_expression(numeric_result$column, 
+      expr <- build_single_filter_expression(numeric_result$column, 
                                        numeric_result$type, 
                                        numeric_result$value())
       cat("Filter Expression:\n")
@@ -240,7 +240,7 @@ single_filter_demo <- function() {
       cat("$is_active():", categorical_result$is_active(), "\n")
       cat("$remove():", if(is.null(categorical_result$remove())) 0 else categorical_result$remove(), "\n\n")
       
-      expr <- build_filter_expression(categorical_result$column, 
+      expr <- build_single_filter_expression(categorical_result$column, 
                                        categorical_result$type, 
                                        categorical_result$value())
       cat("Filter Expression:\n")
@@ -254,7 +254,7 @@ single_filter_demo <- function() {
       cat("$is_active():", date_result$is_active(), "\n")
       cat("$remove():", if(is.null(date_result$remove())) 0 else date_result$remove(), "\n\n")
       
-      expr <- build_filter_expression(date_result$column, 
+      expr <- build_single_filter_expression(date_result$column, 
                                        date_result$type, 
                                        date_result$value())
       cat("Filter Expression:\n")
@@ -497,7 +497,7 @@ create_filter_container <- function(ns, name, filter_input) {
   )
 }
 
-#' Build filter expression from filter state
+#' Build filter expression from single filter state
 #' 
 #' @description
 #' Converts filter values into R/SQL filter expressions that can be used with dplyr/dbplyr.
@@ -520,7 +520,7 @@ create_filter_container <- function(ns, name, filter_input) {
 #'   }
 #'   
 #' @noRd
-build_filter_expression <- function(column_name, column_type, filter_value) {
+build_single_filter_expression <- function(column_name, column_type, filter_value) {
   if (is.null(filter_value) || length(filter_value) == 0) {
     return(NULL)
   }
