@@ -18,7 +18,7 @@ group_builder_server(
 
 \item{column_info}{Reactive. Column info list containing metadata and distinct values}
 
-\item{acceptable_dimensions}{Optional reactive or character vector. If provided, restricts groupable columns to this list}
+\item{acceptable_dimensions}{Optional reactive. If provided, restricts groupable columns to this list}
 }
 \value{
 List of reactive expressions containing grouping variables, banding configs, and regrouping configs

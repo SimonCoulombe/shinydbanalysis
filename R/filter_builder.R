@@ -156,15 +156,15 @@ filter_builder_server <- function(id, storage_info, selected_table_name, restric
         
         col_metadata <- col_info$metadata %>%
           filter(column_name == col_name) %>%
-          as.list()  # Convert to list so metadata$column_type returns a single value
+          as.list()
         
-        filter_module_ui(
+        single_filter_ui(
           full_id, 
-          list(
+          single_column_info = list(
             metadata = col_metadata,
             distinct_values = col_info$distinct_values
           ),
-          states[[id]]
+          initial_value = states[[id]]
         )
       })
       
@@ -187,11 +187,13 @@ add_new_filter <- function(column_name, state, metadata, distinct_values, sessio
   current_id <- generate_filter_id(column_name)
   
   if (!column_exists_in_modules(column_name, state$modules)) {
-    filter_instance <- filter_module_server(
+    filter_instance <- single_filter_server(
       current_id,
-      metadata,
-      distinct_values,
-      state$filter_states[[current_id]]
+      single_column_info = list(
+        metadata = metadata,
+        distinct_values = distinct_values
+      ),
+      initial_value = state$filter_states[[current_id]]
     )
     
     state$modules[[current_id]] <- list(

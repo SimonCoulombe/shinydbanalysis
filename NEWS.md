@@ -1,3 +1,7 @@
+# 1.0.8
+added demo.duckdb and matching column info
+refactoring the filters.. renamed filter_module_xxx to  single_filter_xxx
+
 # shindbanalysis 1.0.7
 broke down summary_builder into group_builder and summary_builder
 

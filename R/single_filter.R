@@ -1,33 +1,32 @@
-#' Create filter module UI components
+#' Create single filter UI components
 #' @param id Character. The module ID
-#' @param column_info List of metadata and distinct values dataframes
+#' @param single_column_info List with metadata and distinct_values dataframes
 #' @param initial_value Vector. Initial filter value(s)
 #' @return Shiny UI element
-filter_module_ui <- function(id, column_info, initial_value = NULL) {
+#' @export
+single_filter_ui <- function(id, single_column_info, initial_value = NULL) {
   ns <- NS(id)
   
-  # Extract column metadata
-  metadata <- column_info$metadata
-  distinct_values <- column_info$distinct_values
+  metadata <- single_column_info$metadata
+  distinct_values <- single_column_info$distinct_values
   
   filter_input <- create_filter_input(ns, metadata, distinct_values, initial_value)
   create_filter_container(ns, metadata$column_name, filter_input)
 }
 
-
-
-#' Create filter module server logic
+#' Create single filter server logic
 #' @param id Character. The module ID
-#' @param metadata Metadata for the column
-#' @param distinct_values Distinct values for categorical columns
+#' @param single_column_info List with metadata and distinct_values
 #' @param initial_value Initial filter value
 #' @return List of reactive values
 #' @export
-filter_module_server <- function(id, metadata, distinct_values, initial_value = NULL) {
+single_filter_server <- function(id, single_column_info, initial_value = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
-    # Set default values if not provided
+    metadata <- single_column_info$metadata
+    distinct_values <- single_column_info$distinct_values
+    
     if (is.null(initial_value)) {
       initial_value <- switch(metadata$column_type,
                               "numeric" = c(as.numeric(metadata$min_value), 
@@ -37,11 +36,9 @@ filter_module_server <- function(id, metadata, distinct_values, initial_value = 
                               "categorical" = character(0))
     }
     
-    # Reactive values
     filter_state <- reactiveVal(initial_value)
     is_active <- reactiveVal(FALSE)
     
-    # Handle select all/deselect all for categorical inputs
     if (metadata$column_type == "categorical") {
       col_values <- distinct_values %>%
         filter(column_name == metadata$column_name) %>%
@@ -66,7 +63,6 @@ filter_module_server <- function(id, metadata, distinct_values, initial_value = 
       }
     }
     
-    # Update filter state when input changes
     observeEvent(input$filter_value, {
       current_state <- filter_state()
       
@@ -87,7 +83,6 @@ filter_module_server <- function(id, metadata, distinct_values, initial_value = 
       }
     }, ignoreNULL = FALSE)
     
-    # Return interface
     list(
       value = filter_state,
       remove = reactive(input$remove),
@@ -98,170 +93,89 @@ filter_module_server <- function(id, metadata, distinct_values, initial_value = 
   })
 }
 
-
-
-#' Demo app for filter_module
+#' Demo app for single_filter
 #'
-#' @param use_real_data Logical. If TRUE, uses packaged demo data. If FALSE, uses synthetic examples.
 #' @return A Shiny app object
 #' @export
 #'
 #' @examples
 #' if (interactive()) {
-#'   filter_module_demo()
-#'   filter_module_demo(use_real_data = FALSE)
+#'   single_filter_demo()
 #' }
-filter_module_demo <- function(use_real_data = TRUE) {
+single_filter_demo <- function() {
+  
+  column_info <- load_demo_column_info("diamonds")
+  
+  carat_info <- list(
+    metadata = column_info$metadata %>% filter(column_name == "carat") %>% as.list(),
+    distinct_values = column_info$distinct_values
+  )
+  
+  cut_info <- list(
+    metadata = column_info$metadata %>% filter(column_name == "cut") %>% as.list(),
+    distinct_values = column_info$distinct_values
+  )
+  
+  gapdata_info <- load_demo_column_info("gapdata")
+  date_info <- list(
+    metadata = gapdata_info$metadata %>% filter(column_name == "date") %>% as.list(),
+    distinct_values = gapdata_info$distinct_values
+  )
   
   ui <- fluidPage(
-    titlePanel("Filter Module Demo"),
-    
-    sidebarLayout(
-      sidebarPanel(
-        width = 4,
-        h3("Select Column to Filter"),
-        selectInput(
-          "column_choice",
-          "Choose a column:",
-          choices = NULL
-        ),
-        hr(),
-        h4("Filter Module:"),
-        uiOutput("filter_ui")
+    titlePanel("Single Filter Demo - Three Column Types"),
+    fluidRow(
+      column(4,
+             h3("Numeric Filter"),
+             single_filter_ui("filter_numeric", carat_info),
+             verbatimTextOutput("expr_numeric")
       ),
-      
-      mainPanel(
-        width = 8,
-        h3("Module State"),
-        verbatimTextOutput("filter_state"),
-        hr(),
-        h3("Generated Filter Expression"),
-        verbatimTextOutput("filter_expression"),
-        hr(),
-        h3("Module Returns"),
-        verbatimTextOutput("module_returns")
+      column(4,
+             h3("Categorical Filter"),
+             single_filter_ui("filter_categorical", cut_info),
+             verbatimTextOutput("expr_categorical")
+      ),
+      column(4,
+             h3("Date Filter"),
+             single_filter_ui("filter_date", date_info),
+             verbatimTextOutput("expr_date")
       )
     )
   )
   
   server <- function(input, output, session) {
     
-    column_info_data <- reactive({
-      if (use_real_data) {
-        load_demo_column_info("diamonds")
-      } else {
-        list(
-          metadata = data.frame(
-            column_name = c("price", "cut", "date_purchased"),
-            column_type = c("numeric", "categorical", "date"),
-            min_value = c(100, NA, NA),
-            max_value = c(1000, NA, NA),
-            min_date = c(NA, NA, as.Date("2020-01-01")),
-            max_date = c(NA, NA, as.Date("2024-12-31")),
-            n_distinct = c(NA, 5, NA),
-            stringsAsFactors = FALSE
-          ),
-          distinct_values = data.frame(
-            column_name = rep("cut", 5),
-            value = c("Fair", "Good", "Very Good", "Premium", "Ideal"),
-            stringsAsFactors = FALSE
-          )
-        )
-      }
+    numeric_result <- single_filter_server("filter_numeric", carat_info)
+    categorical_result <- single_filter_server("filter_categorical", cut_info)
+    date_result <- single_filter_server("filter_date", date_info)
+    
+    output$expr_numeric <- renderPrint({
+      expr <- build_filter_expression(numeric_result$column, 
+                                       numeric_result$type, 
+                                       numeric_result$value())
+      cat("Expression:\n")
+      if (is.null(expr)) cat("(empty)") else cat(expr)
     })
     
-    observe({
-      col_info <- column_info_data()
-      choices <- setNames(
-        col_info$metadata$column_name,
-        paste0(col_info$metadata$column_name, " (", col_info$metadata$column_type, ")")
-      )
-      updateSelectInput(session, "column_choice", choices = choices)
+    output$expr_categorical <- renderPrint({
+      expr <- build_filter_expression(categorical_result$column, 
+                                       categorical_result$type, 
+                                       categorical_result$value())
+      cat("Expression:\n")
+      if (is.null(expr)) cat("(empty)") else cat(expr)
     })
     
-    selected_column_data <- reactive({
-      req(input$column_choice)
-      col_info <- column_info_data()
-      
-      metadata <- col_info$metadata %>%
-        filter(column_name == input$column_choice) %>%
-        as.list()
-      
-      list(
-        metadata = metadata,
-        distinct_values = col_info$distinct_values
-      )
-    })
-    
-    filter_result <- reactive({
-      req(selected_column_data())
-      data <- selected_column_data()
-      
-      filter_module_server(
-        "demo_filter",
-        metadata = data$metadata,
-        distinct_values = data$distinct_values,
-        initial_value = NULL
-      )
-    })
-    
-    output$filter_ui <- renderUI({
-      req(selected_column_data())
-      data <- selected_column_data()
-      
-      filter_module_ui(
-        "demo_filter",
-        column_info = data,
-        initial_value = NULL
-      )
-    })
-    
-    output$filter_state <- renderPrint({
-      req(filter_result())
-      result <- filter_result()
-      
-      cat("Current Filter Value:\n")
-      print(result$value())
-      cat("\n")
-      cat("Is Active:", result$is_active(), "\n")
-      cat("Column:", result$column, "\n")
-      cat("Type:", result$type, "\n")
-    })
-    
-    output$filter_expression <- renderPrint({
-      req(filter_result())
-      result <- filter_result()
-      
-      expr <- build_filter_expression(
-        result$column,
-        result$type,
-        result$value()
-      )
-      
-      if (is.null(expr)) {
-        cat("No filter expression (empty filter)")
-      } else {
-        cat(expr)
-      }
-    })
-    
-    output$module_returns <- renderPrint({
-      req(filter_result())
-      result <- filter_result()
-      
-      cat("Module returns a list with:\n\n")
-      cat("$value: reactiveVal containing filter value\n")
-      cat("$remove: reactive tracking remove button (clicks:", 
-          if(is.null(result$remove())) 0 else result$remove(), ")\n")
-      cat("$column: '", result$column, "'\n", sep = "")
-      cat("$type: '", result$type, "'\n", sep = "")
-      cat("$is_active: reactiveVal (", result$is_active(), ")\n", sep = "")
+    output$expr_date <- renderPrint({
+      expr <- build_filter_expression(date_result$column, 
+                                       date_result$type, 
+                                       date_result$value())
+      cat("Expression:\n")
+      if (is.null(expr)) cat("(empty)") else cat(expr)
     })
   }
   
   shinyApp(ui, server)
 }
-
 
 #' Create appropriate filter input based on column type
 #' @noRd
@@ -313,7 +227,6 @@ create_date_input <- function(ns, metadata, initial_value) {
 #' Create categorical input with support for large value sets and empty cases
 #' @noRd
 create_categorical_input <- function(ns, metadata, distinct_values, initial_value, max_distinct_values = 300) {
-  # Get values for this column
   values <- distinct_values %>%
     filter(column_name == metadata$column_name) %>%
     pull(value)
@@ -321,7 +234,6 @@ create_categorical_input <- function(ns, metadata, distinct_values, initial_valu
   n_distinct <- metadata$n_distinct
   
   if (n_distinct == 0) {
-    # Case 1: Column is all NA
     return(
       div(
         class = "alert alert-warning",
@@ -333,7 +245,6 @@ create_categorical_input <- function(ns, metadata, distinct_values, initial_valu
   }
   
   if (length(values) == 0 && n_distinct > max_distinct_values) {
-    # Case 2: Too many distinct values to fetch
     return(
       div(
         class = "filter-info",
@@ -367,7 +278,6 @@ create_categorical_input <- function(ns, metadata, distinct_values, initial_valu
   }
   
   if (length(values) == 0) {
-    # Case 3: Error fetching values but we know they exist
     return(
       div(
         class = "alert alert-warning",
@@ -378,9 +288,7 @@ create_categorical_input <- function(ns, metadata, distinct_values, initial_valu
     )
   }
   
-  # Case 4: Normal case with values
   if (length(values) <= 8) {
-    # Use checkbox group for few values
     tagList(
       div(
         style = "margin-bottom: 10px;",
@@ -415,7 +323,6 @@ create_categorical_input <- function(ns, metadata, distinct_values, initial_valu
       )
     )
   } else {
-    # Use selectize with manual input support
     tagList(
       div(
         style = "margin-bottom: 10px;",
