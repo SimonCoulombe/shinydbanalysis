@@ -4,16 +4,18 @@
 \alias{single_filter_server}
 \title{Create single filter server logic}
 \usage{
-single_filter_server(id, single_column_info, initial_value = NULL)
+single_filter_server(id, column_info, column_name, initial_value = NULL)
 }
 \arguments{
 \item{id}{Character. The module ID (must match the ID used in \code{single_filter_ui})}
 
-\item{single_column_info}{List with two elements:
+\item{column_info}{List with two elements:
 \itemize{
-\item \code{metadata}: Named list with column information (see \code{single_filter_ui})
+\item \code{metadata}: Dataframe with column information (see \code{single_filter_ui})
 \item \code{distinct_values}: Dataframe with distinct values for categorical columns
 }}
+
+\item{column_name}{Character. The name of the column to filter}
 
 \item{initial_value}{Vector. Optional initial filter value (see \code{single_filter_ui})}
 }
@@ -41,13 +43,9 @@ provides reactive values for accessing the current filter selection.
 \examples{
 if (interactive()) {
   column_info <- load_demo_column_info("diamonds")
-  carat_info <- list(
-    metadata = column_info$metadata \%>\% filter(column_name == "carat") \%>\% as.list(),
-    distinct_values = column_info$distinct_values
-  )
   
   server <- function(input, output, session) {
-    filter_result <- single_filter_server("my_filter", carat_info)
+    filter_result <- single_filter_server("my_filter", column_info, "carat")
     
     observe({
       cat("Current filter value:", filter_result$value(), "\n")

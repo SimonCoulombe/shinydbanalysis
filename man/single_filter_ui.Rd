@@ -4,14 +4,14 @@
 \alias{single_filter_ui}
 \title{Create single filter UI components}
 \usage{
-single_filter_ui(id, single_column_info, initial_value = NULL)
+single_filter_ui(id, column_info, column_name, initial_value = NULL)
 }
 \arguments{
 \item{id}{Character. The module ID (namespace)}
 
-\item{single_column_info}{List with two elements:
+\item{column_info}{List with two elements:
 \itemize{
-\item \code{metadata}: Named list with column information including:
+\item \code{metadata}: Dataframe with column information including:
 \code{column_name}, \code{column_type} ("numeric", "date", or "categorical"),
 \code{min_value}/\code{max_value} (for numeric),
 \code{min_date}/\code{max_date} (for date),
@@ -19,6 +19,8 @@ single_filter_ui(id, single_column_info, initial_value = NULL)
 \item \code{distinct_values}: Dataframe with columns \code{column_name} and
 \code{value} containing distinct values for categorical columns
 }}
+
+\item{column_name}{Character. The name of the column to filter}
 
 \item{initial_value}{Vector. Optional initial filter value(s). For numeric/date,
 a vector of length 2 (min, max). For categorical, a character vector of selected values.
@@ -39,13 +41,9 @@ widget displayed depends on the column type:
 \examples{
 if (interactive()) {
   column_info <- load_demo_column_info("diamonds")
-  carat_info <- list(
-    metadata = column_info$metadata \%>\% filter(column_name == "carat") \%>\% as.list(),
-    distinct_values = column_info$distinct_values
-  )
   
   ui <- fluidPage(
-    single_filter_ui("my_filter", carat_info)
+    single_filter_ui("my_filter", column_info, "carat")
   )
 }
 }

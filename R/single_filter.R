@@ -8,9 +8,9 @@
 #' - Categorical: checkbox group (<=8 values) or selectize input (>8 values)
 #' 
 #' @param id Character. The module ID (namespace)
-#' @param single_column_info List with two elements:
+#' @param column_info List with two elements:
 #'   \itemize{
-#'     \item \code{metadata}: Named list with column information including:
+#'     \item \code{metadata}: Dataframe with column information including:
 #'       \code{column_name}, \code{column_type} ("numeric", "date", or "categorical"),
 #'       \code{min_value}/\code{max_value} (for numeric), 
 #'       \code{min_date}/\code{max_date} (for date),
@@ -18,6 +18,7 @@
 #'     \item \code{distinct_values}: Dataframe with columns \code{column_name} and 
 #'       \code{value} containing distinct values for categorical columns
 #'   }
+#' @param column_name Character. The name of the column to filter
 #' @param initial_value Vector. Optional initial filter value(s). For numeric/date,
 #'   a vector of length 2 (min, max). For categorical, a character vector of selected values.
 #'   If NULL, defaults to full range for numeric/date or no selection for categorical.
@@ -28,20 +29,19 @@
 #' @examples
 #' if (interactive()) {
 #'   column_info <- load_demo_column_info("diamonds")
-#'   carat_info <- list(
-#'     metadata = column_info$metadata %>% filter(column_name == "carat") %>% as.list(),
-#'     distinct_values = column_info$distinct_values
-#'   )
 #'   
 #'   ui <- fluidPage(
-#'     single_filter_ui("my_filter", carat_info)
+#'     single_filter_ui("my_filter", column_info, "carat")
 #'   )
 #' }
-single_filter_ui <- function(id, single_column_info, initial_value = NULL) {
+single_filter_ui <- function(id, column_info, column_name, initial_value = NULL) {
   ns <- NS(id)
   
-  metadata <- single_column_info$metadata
-  distinct_values <- single_column_info$distinct_values
+  metadata <- column_info$metadata %>%
+    filter(column_name == !!column_name) %>%
+    as.list()
+  
+  distinct_values <- column_info$distinct_values
   
   filter_input <- create_filter_input(ns, metadata, distinct_values, initial_value)
   create_filter_container(ns, metadata$column_name, filter_input)
@@ -54,11 +54,12 @@ single_filter_ui <- function(id, single_column_info, initial_value = NULL) {
 #' provides reactive values for accessing the current filter selection.
 #' 
 #' @param id Character. The module ID (must match the ID used in \code{single_filter_ui})
-#' @param single_column_info List with two elements:
+#' @param column_info List with two elements:
 #'   \itemize{
-#'     \item \code{metadata}: Named list with column information (see \code{single_filter_ui})
+#'     \item \code{metadata}: Dataframe with column information (see \code{single_filter_ui})
 #'     \item \code{distinct_values}: Dataframe with distinct values for categorical columns
 #'   }
+#' @param column_name Character. The name of the column to filter
 #' @param initial_value Vector. Optional initial filter value (see \code{single_filter_ui})
 #' 
 #' @return A list with five reactive elements:
@@ -82,13 +83,9 @@ single_filter_ui <- function(id, single_column_info, initial_value = NULL) {
 #' @examples
 #' if (interactive()) {
 #'   column_info <- load_demo_column_info("diamonds")
-#'   carat_info <- list(
-#'     metadata = column_info$metadata %>% filter(column_name == "carat") %>% as.list(),
-#'     distinct_values = column_info$distinct_values
-#'   )
 #'   
 #'   server <- function(input, output, session) {
-#'     filter_result <- single_filter_server("my_filter", carat_info)
+#'     filter_result <- single_filter_server("my_filter", column_info, "carat")
 #'     
 #'     observe({
 #'       cat("Current filter value:", filter_result$value(), "\n")
@@ -98,12 +95,15 @@ single_filter_ui <- function(id, single_column_info, initial_value = NULL) {
 #'     })
 #'   }
 #' }
-single_filter_server <- function(id, single_column_info, initial_value = NULL) {
+single_filter_server <- function(id, column_info, column_name, initial_value = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
-    metadata <- single_column_info$metadata
-    distinct_values <- single_column_info$distinct_values
+    metadata <- column_info$metadata %>%
+      filter(column_name == !!column_name) %>%
+      as.list()
+    
+    distinct_values <- column_info$distinct_values
     
     if (is.null(initial_value)) {
       initial_value <- switch(metadata$column_type,
@@ -186,42 +186,27 @@ single_filter_server <- function(id, single_column_info, initial_value = NULL) {
 #' }
 single_filter_demo <- function() {
   
-  column_info <- load_demo_column_info("diamonds")
-  
-  carat_info <- list(
-    metadata = column_info$metadata %>% filter(column_name == "carat") %>% as.list(),
-    distinct_values = column_info$distinct_values
-  )
-  
-  cut_info <- list(
-    metadata = column_info$metadata %>% filter(column_name == "cut") %>% as.list(),
-    distinct_values = column_info$distinct_values
-  )
-  
+  diamonds_info <- load_demo_column_info("diamonds")
   gapdata_info <- load_demo_column_info("gapdata")
-  date_info <- list(
-    metadata = gapdata_info$metadata %>% filter(column_name == "date") %>% as.list(),
-    distinct_values = gapdata_info$distinct_values
-  )
   
   ui <- fluidPage(
     titlePanel("Single Filter Demo - Three Column Types"),
     fluidRow(
       column(4,
              h3("Numeric Filter (carat)"),
-             single_filter_ui("filter_numeric", carat_info),
+             single_filter_ui("filter_numeric", diamonds_info, "carat"),
              h4("Module Returns:"),
              verbatimTextOutput("output_numeric")
       ),
       column(4,
              h3("Categorical Filter (cut)"),
-             single_filter_ui("filter_categorical", cut_info),
+             single_filter_ui("filter_categorical", diamonds_info, "cut"),
              h4("Module Returns:"),
              verbatimTextOutput("output_categorical")
       ),
       column(4,
              h3("Date Filter (date)"),
-             single_filter_ui("filter_date", date_info),
+             single_filter_ui("filter_date", gapdata_info, "date"),
              h4("Module Returns:"),
              verbatimTextOutput("output_date")
       )
@@ -230,9 +215,9 @@ single_filter_demo <- function() {
   
   server <- function(input, output, session) {
     
-    numeric_result <- single_filter_server("filter_numeric", carat_info)
-    categorical_result <- single_filter_server("filter_categorical", cut_info)
-    date_result <- single_filter_server("filter_date", date_info)
+    numeric_result <- single_filter_server("filter_numeric", diamonds_info, "carat")
+    categorical_result <- single_filter_server("filter_categorical", diamonds_info, "cut")
+    date_result <- single_filter_server("filter_date", gapdata_info, "date")
     
     output$output_numeric <- renderPrint({
       cat("$column:", numeric_result$column, "\n")

@@ -92,11 +92,7 @@ filter_builder_server <- function(id, storage_info, selected_table_name, restric
       req(input$add_filter != "")
       col_info <- column_info()
       
-      col_metadata <- col_info$metadata %>%
-        filter(column_name == input$add_filter) %>%
-        as.list()  # Convert to list so metadata$column_type returns a single value
-      
-      add_new_filter(input$add_filter, state, col_metadata, col_info$distinct_values, session)
+      add_new_filter(input$add_filter, state, col_info, session)
       updateSelectInput(session, "add_filter", selected = "")
     })
     
@@ -154,16 +150,10 @@ filter_builder_server <- function(id, storage_info, selected_table_name, restric
         full_id <- ns(id)
         col_name <- mods[[id]]$instance$column
         
-        col_metadata <- col_info$metadata %>%
-          filter(column_name == col_name) %>%
-          as.list()
-        
         single_filter_ui(
           full_id, 
-          single_column_info = list(
-            metadata = col_metadata,
-            distinct_values = col_info$distinct_values
-          ),
+          column_info = col_info,
+          column_name = col_name,
           initial_value = states[[id]]
         )
       })
@@ -183,16 +173,14 @@ filter_builder_server <- function(id, storage_info, selected_table_name, restric
 
 #' Add a new filter to the state
 #' @noRd
-add_new_filter <- function(column_name, state, metadata, distinct_values, session) {
+add_new_filter <- function(column_name, state, column_info, session) {
   current_id <- generate_filter_id(column_name)
   
   if (!column_exists_in_modules(column_name, state$modules)) {
     filter_instance <- single_filter_server(
       current_id,
-      single_column_info = list(
-        metadata = metadata,
-        distinct_values = distinct_values
-      ),
+      column_info = column_info,
+      column_name = column_name,
       initial_value = state$filter_states[[current_id]]
     )
     
