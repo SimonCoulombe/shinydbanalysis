@@ -14,6 +14,255 @@ filter_module_ui <- function(id, column_info, initial_value = NULL) {
   create_filter_container(ns, metadata$column_name, filter_input)
 }
 
+
+
+#' Create filter module server logic
+#' @param id Character. The module ID
+#' @param metadata Metadata for the column
+#' @param distinct_values Distinct values for categorical columns
+#' @param initial_value Initial filter value
+#' @return List of reactive values
+#' @export
+filter_module_server <- function(id, metadata, distinct_values, initial_value = NULL) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+    
+    # Set default values if not provided
+    if (is.null(initial_value)) {
+      initial_value <- switch(metadata$column_type,
+                              "numeric" = c(as.numeric(metadata$min_value), 
+                                            as.numeric(metadata$max_value)),
+                              "date" = c(as.Date(metadata$min_date), 
+                                         as.Date(metadata$max_date)),
+                              "categorical" = character(0))
+    }
+    
+    # Reactive values
+    filter_state <- reactiveVal(initial_value)
+    is_active <- reactiveVal(FALSE)
+    
+    # Handle select all/deselect all for categorical inputs
+    if (metadata$column_type == "categorical") {
+      col_values <- distinct_values %>%
+        filter(column_name == metadata$column_name) %>%
+        pull(value)
+      
+      if (length(col_values) > 0 && length(col_values) <= 300) {
+        observeEvent(input$select_all, {
+          if (length(col_values) > 8) {
+            updateSelectizeInput(session, "filter_value", selected = col_values)
+          } else {
+            updateCheckboxGroupInput(session, "filter_value", selected = col_values)
+          }
+        })
+        
+        observeEvent(input$deselect_all, {
+          if (length(col_values) > 8) {
+            updateSelectizeInput(session, "filter_value", selected = character(0))
+          } else {
+            updateCheckboxGroupInput(session, "filter_value", selected = character(0))
+          }
+        })
+      }
+    }
+    
+    # Update filter state when input changes
+    observeEvent(input$filter_value, {
+      current_state <- filter_state()
+      
+      if (metadata$column_type == "date") {
+        if (length(input$filter_value) == 2 && 
+            !is.na(input$filter_value[1]) && 
+            !is.na(input$filter_value[2])) {
+          if (!identical(as.character(current_state), as.character(input$filter_value))) {
+            is_active(TRUE)
+            filter_state(input$filter_value)
+          }
+        }
+      } else {
+        if (!identical(current_state, input$filter_value)) {
+          is_active(TRUE)
+          filter_state(input$filter_value)
+        }
+      }
+    }, ignoreNULL = FALSE)
+    
+    # Return interface
+    list(
+      value = filter_state,
+      remove = reactive(input$remove),
+      column = metadata$column_name,
+      type = metadata$column_type,
+      is_active = is_active
+    )
+  })
+}
+
+
+
+#' Demo app for filter_module
+#'
+#' @param use_real_data Logical. If TRUE, uses packaged demo data. If FALSE, uses synthetic examples.
+#' @return A Shiny app object
+#' @export
+#'
+#' @examples
+#' if (interactive()) {
+#'   filter_module_demo()
+#'   filter_module_demo(use_real_data = FALSE)
+#' }
+filter_module_demo <- function(use_real_data = TRUE) {
+  
+  ui <- fluidPage(
+    titlePanel("Filter Module Demo"),
+    
+    sidebarLayout(
+      sidebarPanel(
+        width = 4,
+        h3("Select Column to Filter"),
+        selectInput(
+          "column_choice",
+          "Choose a column:",
+          choices = NULL
+        ),
+        hr(),
+        h4("Filter Module:"),
+        uiOutput("filter_ui")
+      ),
+      
+      mainPanel(
+        width = 8,
+        h3("Module State"),
+        verbatimTextOutput("filter_state"),
+        hr(),
+        h3("Generated Filter Expression"),
+        verbatimTextOutput("filter_expression"),
+        hr(),
+        h3("Module Returns"),
+        verbatimTextOutput("module_returns")
+      )
+    )
+  )
+  
+  server <- function(input, output, session) {
+    
+    column_info_data <- reactive({
+      if (use_real_data) {
+        load_demo_column_info("diamonds")
+      } else {
+        list(
+          metadata = data.frame(
+            column_name = c("price", "cut", "date_purchased"),
+            column_type = c("numeric", "categorical", "date"),
+            min_value = c(100, NA, NA),
+            max_value = c(1000, NA, NA),
+            min_date = c(NA, NA, as.Date("2020-01-01")),
+            max_date = c(NA, NA, as.Date("2024-12-31")),
+            n_distinct = c(NA, 5, NA),
+            stringsAsFactors = FALSE
+          ),
+          distinct_values = data.frame(
+            column_name = rep("cut", 5),
+            value = c("Fair", "Good", "Very Good", "Premium", "Ideal"),
+            stringsAsFactors = FALSE
+          )
+        )
+      }
+    })
+    
+    observe({
+      col_info <- column_info_data()
+      choices <- setNames(
+        col_info$metadata$column_name,
+        paste0(col_info$metadata$column_name, " (", col_info$metadata$column_type, ")")
+      )
+      updateSelectInput(session, "column_choice", choices = choices)
+    })
+    
+    selected_column_data <- reactive({
+      req(input$column_choice)
+      col_info <- column_info_data()
+      
+      metadata <- col_info$metadata %>%
+        filter(column_name == input$column_choice) %>%
+        as.list()
+      
+      list(
+        metadata = metadata,
+        distinct_values = col_info$distinct_values
+      )
+    })
+    
+    filter_result <- reactive({
+      req(selected_column_data())
+      data <- selected_column_data()
+      
+      filter_module_server(
+        "demo_filter",
+        metadata = data$metadata,
+        distinct_values = data$distinct_values,
+        initial_value = NULL
+      )
+    })
+    
+    output$filter_ui <- renderUI({
+      req(selected_column_data())
+      data <- selected_column_data()
+      
+      filter_module_ui(
+        "demo_filter",
+        column_info = data,
+        initial_value = NULL
+      )
+    })
+    
+    output$filter_state <- renderPrint({
+      req(filter_result())
+      result <- filter_result()
+      
+      cat("Current Filter Value:\n")
+      print(result$value())
+      cat("\n")
+      cat("Is Active:", result$is_active(), "\n")
+      cat("Column:", result$column, "\n")
+      cat("Type:", result$type, "\n")
+    })
+    
+    output$filter_expression <- renderPrint({
+      req(filter_result())
+      result <- filter_result()
+      
+      expr <- build_filter_expression(
+        result$column,
+        result$type,
+        result$value()
+      )
+      
+      if (is.null(expr)) {
+        cat("No filter expression (empty filter)")
+      } else {
+        cat(expr)
+      }
+    })
+    
+    output$module_returns <- renderPrint({
+      req(filter_result())
+      result <- filter_result()
+      
+      cat("Module returns a list with:\n\n")
+      cat("$value: reactiveVal containing filter value\n")
+      cat("$remove: reactive tracking remove button (clicks:", 
+          if(is.null(result$remove())) 0 else result$remove(), ")\n")
+      cat("$column: '", result$column, "'\n", sep = "")
+      cat("$type: '", result$type, "'\n", sep = "")
+      cat("$is_active: reactiveVal (", result$is_active(), ")\n", sep = "")
+    })
+  }
+  
+  shinyApp(ui, server)
+}
+
+
 #' Create appropriate filter input based on column type
 #' @noRd
 create_filter_input <- function(ns, metadata, distinct_values, initial_value) {
@@ -253,88 +502,6 @@ create_filter_container <- function(ns, name, filter_input) {
   )
 }
 
-#' Create filter module server logic
-#' @param id Character. The module ID
-#' @param metadata Metadata for the column
-#' @param distinct_values Distinct values for categorical columns
-#' @param initial_value Initial filter value
-#' @return List of reactive values
-#' @export
-filter_module_server <- function(id, metadata, distinct_values, initial_value = NULL) {
-  moduleServer(id, function(input, output, session) {
-    ns <- session$ns
-    
-    # Set default values if not provided
-    if (is.null(initial_value)) {
-      initial_value <- switch(metadata$column_type,
-                              "numeric" = c(as.numeric(metadata$min_value), 
-                                            as.numeric(metadata$max_value)),
-                              "date" = c(as.Date(metadata$min_date), 
-                                         as.Date(metadata$max_date)),
-                              "categorical" = character(0))
-    }
-    
-    # Reactive values
-    filter_state <- reactiveVal(initial_value)
-    is_active <- reactiveVal(FALSE)
-    
-    # Handle select all/deselect all for categorical inputs
-    if (metadata$column_type == "categorical") {
-      col_values <- distinct_values %>%
-        filter(column_name == metadata$column_name) %>%
-        pull(value)
-      
-      if (length(col_values) > 0 && length(col_values) <= 300) {
-        observeEvent(input$select_all, {
-          if (length(col_values) > 8) {
-            updateSelectizeInput(session, "filter_value", selected = col_values)
-          } else {
-            updateCheckboxGroupInput(session, "filter_value", selected = col_values)
-          }
-        })
-        
-        observeEvent(input$deselect_all, {
-          if (length(col_values) > 8) {
-            updateSelectizeInput(session, "filter_value", selected = character(0))
-          } else {
-            updateCheckboxGroupInput(session, "filter_value", selected = character(0))
-          }
-        })
-      }
-    }
-    
-    # Update filter state when input changes
-    observeEvent(input$filter_value, {
-      current_state <- filter_state()
-      
-      if (metadata$column_type == "date") {
-        if (length(input$filter_value) == 2 && 
-            !is.na(input$filter_value[1]) && 
-            !is.na(input$filter_value[2])) {
-          if (!identical(as.character(current_state), as.character(input$filter_value))) {
-            is_active(TRUE)
-            filter_state(input$filter_value)
-          }
-        }
-      } else {
-        if (!identical(current_state, input$filter_value)) {
-          is_active(TRUE)
-          filter_state(input$filter_value)
-        }
-      }
-    }, ignoreNULL = FALSE)
-    
-    # Return interface
-    list(
-      value = filter_state,
-      remove = reactive(input$remove),
-      column = metadata$column_name,
-      type = metadata$column_type,
-      is_active = is_active
-    )
-  })
-}
-
 #' Build filter expression from filter state
 #' @param column_name Column name
 #' @param column_type Column type
@@ -357,167 +524,4 @@ build_filter_expression <- function(column_name, column_type, filter_value) {
            values_str <- paste(sprintf("'%s'", filter_value), collapse = ", ")
            sprintf("%s %%in%% c(%s)", column_name, values_str)
          })
-}
-
-
-#' Demo app for filter_module
-#'
-#' @param use_real_data Logical. If TRUE, uses packaged demo data. If FALSE, uses synthetic examples.
-#' @return A Shiny app object
-#' @export
-#'
-#' @examples
-#' if (interactive()) {
-#'   filter_module_demo()
-#'   filter_module_demo(use_real_data = FALSE)
-#' }
-filter_module_demo <- function(use_real_data = TRUE) {
-  
-  ui <- fluidPage(
-    titlePanel("Filter Module Demo"),
-    
-    sidebarLayout(
-      sidebarPanel(
-        width = 4,
-        h3("Select Column to Filter"),
-        selectInput(
-          "column_choice",
-          "Choose a column:",
-          choices = NULL
-        ),
-        hr(),
-        h4("Filter Module:"),
-        uiOutput("filter_ui")
-      ),
-      
-      mainPanel(
-        width = 8,
-        h3("Module State"),
-        verbatimTextOutput("filter_state"),
-        hr(),
-        h3("Generated Filter Expression"),
-        verbatimTextOutput("filter_expression"),
-        hr(),
-        h3("Module Returns"),
-        verbatimTextOutput("module_returns")
-      )
-    )
-  )
-  
-  server <- function(input, output, session) {
-    
-    column_info_data <- reactive({
-      if (use_real_data) {
-        load_demo_column_info("diamonds")
-      } else {
-        list(
-          metadata = data.frame(
-            column_name = c("price", "cut", "date_purchased"),
-            column_type = c("numeric", "categorical", "date"),
-            min_value = c(100, NA, NA),
-            max_value = c(1000, NA, NA),
-            min_date = c(NA, NA, as.Date("2020-01-01")),
-            max_date = c(NA, NA, as.Date("2024-12-31")),
-            n_distinct = c(NA, 5, NA),
-            stringsAsFactors = FALSE
-          ),
-          distinct_values = data.frame(
-            column_name = rep("cut", 5),
-            value = c("Fair", "Good", "Very Good", "Premium", "Ideal"),
-            stringsAsFactors = FALSE
-          )
-        )
-      }
-    })
-    
-    observe({
-      col_info <- column_info_data()
-      choices <- setNames(
-        col_info$metadata$column_name,
-        paste0(col_info$metadata$column_name, " (", col_info$metadata$column_type, ")")
-      )
-      updateSelectInput(session, "column_choice", choices = choices)
-    })
-    
-    selected_column_data <- reactive({
-      req(input$column_choice)
-      col_info <- column_info_data()
-      
-      metadata <- col_info$metadata %>%
-        filter(column_name == input$column_choice) %>%
-        as.list()
-      
-      list(
-        metadata = metadata,
-        distinct_values = col_info$distinct_values
-      )
-    })
-    
-    filter_result <- reactive({
-      req(selected_column_data())
-      data <- selected_column_data()
-      
-      filter_module_server(
-        "demo_filter",
-        metadata = data$metadata,
-        distinct_values = data$distinct_values,
-        initial_value = NULL
-      )
-    })
-    
-    output$filter_ui <- renderUI({
-      req(selected_column_data())
-      data <- selected_column_data()
-      
-      filter_module_ui(
-        "demo_filter",
-        column_info = data,
-        initial_value = NULL
-      )
-    })
-    
-    output$filter_state <- renderPrint({
-      req(filter_result())
-      result <- filter_result()
-      
-      cat("Current Filter Value:\n")
-      print(result$value())
-      cat("\n")
-      cat("Is Active:", result$is_active(), "\n")
-      cat("Column:", result$column, "\n")
-      cat("Type:", result$type, "\n")
-    })
-    
-    output$filter_expression <- renderPrint({
-      req(filter_result())
-      result <- filter_result()
-      
-      expr <- build_filter_expression(
-        result$column,
-        result$type,
-        result$value()
-      )
-      
-      if (is.null(expr)) {
-        cat("No filter expression (empty filter)")
-      } else {
-        cat(expr)
-      }
-    })
-    
-    output$module_returns <- renderPrint({
-      req(filter_result())
-      result <- filter_result()
-      
-      cat("Module returns a list with:\n\n")
-      cat("$value: reactiveVal containing filter value\n")
-      cat("$remove: reactive tracking remove button (clicks:", 
-          if(is.null(result$remove())) 0 else result$remove(), ")\n")
-      cat("$column: '", result$column, "'\n", sep = "")
-      cat("$type: '", result$type, "'\n", sep = "")
-      cat("$is_active: reactiveVal (", result$is_active(), ")\n", sep = "")
-    })
-  }
-  
-  shinyApp(ui, server)
 }
