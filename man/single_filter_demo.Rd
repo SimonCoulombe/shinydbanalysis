@@ -10,7 +10,8 @@ single_filter_demo()
 A Shiny app object
 }
 \description{
-Demo app for single_filter
+Demonstrates the single_filter module with three different column types
+(numeric, categorical, and date). Shows all values returned by the server function.
 }
 \examples{
 if (interactive()) {

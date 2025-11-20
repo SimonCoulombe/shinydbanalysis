@@ -1,9 +1,42 @@
 #' Create single filter UI components
-#' @param id Character. The module ID
-#' @param single_column_info List with metadata and distinct_values dataframes
-#' @param initial_value Vector. Initial filter value(s)
-#' @return Shiny UI element
+#' 
+#' @description
+#' Creates a UI component for filtering a single database column. The type of filter
+#' widget displayed depends on the column type:
+#' - Numeric: slider input with min/max range
+#' - Date: date range input
+#' - Categorical: checkbox group (<=8 values) or selectize input (>8 values)
+#' 
+#' @param id Character. The module ID (namespace)
+#' @param single_column_info List with two elements:
+#'   \itemize{
+#'     \item \code{metadata}: Named list with column information including:
+#'       \code{column_name}, \code{column_type} ("numeric", "date", or "categorical"),
+#'       \code{min_value}/\code{max_value} (for numeric), 
+#'       \code{min_date}/\code{max_date} (for date),
+#'       \code{n_distinct} (for categorical)
+#'     \item \code{distinct_values}: Dataframe with columns \code{column_name} and 
+#'       \code{value} containing distinct values for categorical columns
+#'   }
+#' @param initial_value Vector. Optional initial filter value(s). For numeric/date,
+#'   a vector of length 2 (min, max). For categorical, a character vector of selected values.
+#'   If NULL, defaults to full range for numeric/date or no selection for categorical.
+#'   
+#' @return A Shiny UI tagList containing the filter widget with a remove button
 #' @export
+#' 
+#' @examples
+#' if (interactive()) {
+#'   column_info <- load_demo_column_info("diamonds")
+#'   carat_info <- list(
+#'     metadata = column_info$metadata %>% filter(column_name == "carat") %>% as.list(),
+#'     distinct_values = column_info$distinct_values
+#'   )
+#'   
+#'   ui <- fluidPage(
+#'     single_filter_ui("my_filter", carat_info)
+#'   )
+#' }
 single_filter_ui <- function(id, single_column_info, initial_value = NULL) {
   ns <- NS(id)
   
@@ -15,11 +48,56 @@ single_filter_ui <- function(id, single_column_info, initial_value = NULL) {
 }
 
 #' Create single filter server logic
-#' @param id Character. The module ID
-#' @param single_column_info List with metadata and distinct_values
-#' @param initial_value Initial filter value
-#' @return List of reactive values
+#' 
+#' @description
+#' Server logic for a single column filter module. Manages the filter state and 
+#' provides reactive values for accessing the current filter selection.
+#' 
+#' @param id Character. The module ID (must match the ID used in \code{single_filter_ui})
+#' @param single_column_info List with two elements:
+#'   \itemize{
+#'     \item \code{metadata}: Named list with column information (see \code{single_filter_ui})
+#'     \item \code{distinct_values}: Dataframe with distinct values for categorical columns
+#'   }
+#' @param initial_value Vector. Optional initial filter value (see \code{single_filter_ui})
+#' 
+#' @return A list with five reactive elements:
+#'   \describe{
+#'     \item{\code{value}}{reactiveVal containing the current filter value. 
+#'       For numeric/date: vector of length 2 (min, max). 
+#'       For categorical: character vector of selected values.
+#'       Access with \code{result$value()}}
+#'     \item{\code{remove}}{Reactive returning the number of times the remove button 
+#'       has been clicked. Access with \code{result$remove()}}
+#'     \item{\code{column}}{Character string with the column name being filtered. 
+#'       Access with \code{result$column}}
+#'     \item{\code{type}}{Character string with the column type ("numeric", "date", or "categorical").
+#'       Access with \code{result$type}}
+#'     \item{\code{is_active}}{reactiveVal indicating if the filter has been modified 
+#'       from its default state. Access with \code{result$is_active()}}
+#'   }
+#'   
 #' @export
+#' 
+#' @examples
+#' if (interactive()) {
+#'   column_info <- load_demo_column_info("diamonds")
+#'   carat_info <- list(
+#'     metadata = column_info$metadata %>% filter(column_name == "carat") %>% as.list(),
+#'     distinct_values = column_info$distinct_values
+#'   )
+#'   
+#'   server <- function(input, output, session) {
+#'     filter_result <- single_filter_server("my_filter", carat_info)
+#'     
+#'     observe({
+#'       cat("Current filter value:", filter_result$value(), "\n")
+#'       cat("Column:", filter_result$column, "\n")
+#'       cat("Type:", filter_result$type, "\n")
+#'       cat("Is active:", filter_result$is_active(), "\n")
+#'     })
+#'   }
+#' }
 single_filter_server <- function(id, single_column_info, initial_value = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -95,6 +173,10 @@ single_filter_server <- function(id, single_column_info, initial_value = NULL) {
 
 #' Demo app for single_filter
 #'
+#' @description
+#' Demonstrates the single_filter module with three different column types 
+#' (numeric, categorical, and date). Shows all values returned by the server function.
+#' 
 #' @return A Shiny app object
 #' @export
 #'
@@ -126,19 +208,22 @@ single_filter_demo <- function() {
     titlePanel("Single Filter Demo - Three Column Types"),
     fluidRow(
       column(4,
-             h3("Numeric Filter"),
+             h3("Numeric Filter (carat)"),
              single_filter_ui("filter_numeric", carat_info),
-             verbatimTextOutput("expr_numeric")
+             h4("Module Returns:"),
+             verbatimTextOutput("output_numeric")
       ),
       column(4,
-             h3("Categorical Filter"),
+             h3("Categorical Filter (cut)"),
              single_filter_ui("filter_categorical", cut_info),
-             verbatimTextOutput("expr_categorical")
+             h4("Module Returns:"),
+             verbatimTextOutput("output_categorical")
       ),
       column(4,
-             h3("Date Filter"),
+             h3("Date Filter (date)"),
              single_filter_ui("filter_date", date_info),
-             verbatimTextOutput("expr_date")
+             h4("Module Returns:"),
+             verbatimTextOutput("output_date")
       )
     )
   )
@@ -149,27 +234,45 @@ single_filter_demo <- function() {
     categorical_result <- single_filter_server("filter_categorical", cut_info)
     date_result <- single_filter_server("filter_date", date_info)
     
-    output$expr_numeric <- renderPrint({
+    output$output_numeric <- renderPrint({
+      cat("$column:", numeric_result$column, "\n")
+      cat("$type:", numeric_result$type, "\n")
+      cat("$value():", paste(numeric_result$value(), collapse = ", "), "\n")
+      cat("$is_active():", numeric_result$is_active(), "\n")
+      cat("$remove():", if(is.null(numeric_result$remove())) 0 else numeric_result$remove(), "\n\n")
+      
       expr <- build_filter_expression(numeric_result$column, 
                                        numeric_result$type, 
                                        numeric_result$value())
-      cat("Expression:\n")
+      cat("Filter Expression:\n")
       if (is.null(expr)) cat("(empty)") else cat(expr)
     })
     
-    output$expr_categorical <- renderPrint({
+    output$output_categorical <- renderPrint({
+      cat("$column:", categorical_result$column, "\n")
+      cat("$type:", categorical_result$type, "\n")
+      cat("$value():", paste(categorical_result$value(), collapse = ", "), "\n")
+      cat("$is_active():", categorical_result$is_active(), "\n")
+      cat("$remove():", if(is.null(categorical_result$remove())) 0 else categorical_result$remove(), "\n\n")
+      
       expr <- build_filter_expression(categorical_result$column, 
                                        categorical_result$type, 
                                        categorical_result$value())
-      cat("Expression:\n")
+      cat("Filter Expression:\n")
       if (is.null(expr)) cat("(empty)") else cat(expr)
     })
     
-    output$expr_date <- renderPrint({
+    output$output_date <- renderPrint({
+      cat("$column:", date_result$column, "\n")
+      cat("$type:", date_result$type, "\n")
+      cat("$value():", paste(date_result$value(), collapse = ", "), "\n")
+      cat("$is_active():", date_result$is_active(), "\n")
+      cat("$remove():", if(is.null(date_result$remove())) 0 else date_result$remove(), "\n\n")
+      
       expr <- build_filter_expression(date_result$column, 
                                        date_result$type, 
                                        date_result$value())
-      cat("Expression:\n")
+      cat("Filter Expression:\n")
       if (is.null(expr)) cat("(empty)") else cat(expr)
     })
   }
@@ -410,10 +513,27 @@ create_filter_container <- function(ns, name, filter_input) {
 }
 
 #' Build filter expression from filter state
-#' @param column_name Column name
-#' @param column_type Column type
-#' @param filter_value Filter value
-#' @return Character string containing filter expression
+#' 
+#' @description
+#' Converts filter values into R/SQL filter expressions that can be used with dplyr/dbplyr.
+#' 
+#' @param column_name Character. The name of the column being filtered
+#' @param column_type Character. The type of column: "numeric", "date", or "categorical"
+#' @param filter_value Vector. The filter value(s):
+#'   \itemize{
+#'     \item For numeric: numeric vector of length 2 (min, max)
+#'     \item For date: Date vector of length 2 (start, end)
+#'     \item For categorical: character vector of selected values
+#'   }
+#'   
+#' @return Character string containing the filter expression, or NULL if filter_value is empty.
+#'   Examples:
+#'   \itemize{
+#'     \item Numeric: \code{"price >= 100.000000 & price <= 500.000000"}
+#'     \item Date: \code{"date >= as.Date('2020-01-01') & date <= as.Date('2023-12-31')"}
+#'     \item Categorical: \code{"cut \%in\% c('Ideal', 'Premium')"}
+#'   }
+#'   
 #' @noRd
 build_filter_expression <- function(column_name, column_type, filter_value) {
   if (is.null(filter_value) || length(filter_value) == 0) {

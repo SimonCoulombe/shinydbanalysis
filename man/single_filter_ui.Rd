@@ -7,15 +7,45 @@
 single_filter_ui(id, single_column_info, initial_value = NULL)
 }
 \arguments{
-\item{id}{Character. The module ID}
+\item{id}{Character. The module ID (namespace)}
 
-\item{single_column_info}{List with metadata and distinct_values dataframes}
+\item{single_column_info}{List with two elements:
+\itemize{
+\item \code{metadata}: Named list with column information including:
+\code{column_name}, \code{column_type} ("numeric", "date", or "categorical"),
+\code{min_value}/\code{max_value} (for numeric),
+\code{min_date}/\code{max_date} (for date),
+\code{n_distinct} (for categorical)
+\item \code{distinct_values}: Dataframe with columns \code{column_name} and
+\code{value} containing distinct values for categorical columns
+}}
 
-\item{initial_value}{Vector. Initial filter value(s)}
+\item{initial_value}{Vector. Optional initial filter value(s). For numeric/date,
+a vector of length 2 (min, max). For categorical, a character vector of selected values.
+If NULL, defaults to full range for numeric/date or no selection for categorical.}
 }
 \value{
-Shiny UI element
+A Shiny UI tagList containing the filter widget with a remove button
 }
 \description{
-Create single filter UI components
+Creates a UI component for filtering a single database column. The type of filter
+widget displayed depends on the column type:
+\itemize{
+\item Numeric: slider input with min/max range
+\item Date: date range input
+\item Categorical: checkbox group (<=8 values) or selectize input (>8 values)
+}
+}
+\examples{
+if (interactive()) {
+  column_info <- load_demo_column_info("diamonds")
+  carat_info <- list(
+    metadata = column_info$metadata \%>\% filter(column_name == "carat") \%>\% as.list(),
+    distinct_values = column_info$distinct_values
+  )
+  
+  ui <- fluidPage(
+    single_filter_ui("my_filter", carat_info)
+  )
+}
 }

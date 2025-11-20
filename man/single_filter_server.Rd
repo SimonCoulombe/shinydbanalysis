@@ -7,15 +7,54 @@
 single_filter_server(id, single_column_info, initial_value = NULL)
 }
 \arguments{
-\item{id}{Character. The module ID}
+\item{id}{Character. The module ID (must match the ID used in \code{single_filter_ui})}
 
-\item{single_column_info}{List with metadata and distinct_values}
+\item{single_column_info}{List with two elements:
+\itemize{
+\item \code{metadata}: Named list with column information (see \code{single_filter_ui})
+\item \code{distinct_values}: Dataframe with distinct values for categorical columns
+}}
 
-\item{initial_value}{Initial filter value}
+\item{initial_value}{Vector. Optional initial filter value (see \code{single_filter_ui})}
 }
 \value{
-List of reactive values
+A list with five reactive elements:
+\describe{
+\item{\code{value}}{reactiveVal containing the current filter value.
+For numeric/date: vector of length 2 (min, max).
+For categorical: character vector of selected values.
+Access with \code{result$value()}}
+\item{\code{remove}}{Reactive returning the number of times the remove button
+has been clicked. Access with \code{result$remove()}}
+\item{\code{column}}{Character string with the column name being filtered.
+Access with \code{result$column}}
+\item{\code{type}}{Character string with the column type ("numeric", "date", or "categorical").
+Access with \code{result$type}}
+\item{\code{is_active}}{reactiveVal indicating if the filter has been modified
+from its default state. Access with \code{result$is_active()}}
+}
 }
 \description{
-Create single filter server logic
+Server logic for a single column filter module. Manages the filter state and
+provides reactive values for accessing the current filter selection.
+}
+\examples{
+if (interactive()) {
+  column_info <- load_demo_column_info("diamonds")
+  carat_info <- list(
+    metadata = column_info$metadata \%>\% filter(column_name == "carat") \%>\% as.list(),
+    distinct_values = column_info$distinct_values
+  )
+  
+  server <- function(input, output, session) {
+    filter_result <- single_filter_server("my_filter", carat_info)
+    
+    observe({
+      cat("Current filter value:", filter_result$value(), "\n")
+      cat("Column:", filter_result$column, "\n")
+      cat("Type:", filter_result$type, "\n")
+      cat("Is active:", filter_result$is_active(), "\n")
+    })
+  }
+}
 }
