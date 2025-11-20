@@ -2,7 +2,7 @@
 % Please edit documentation in R/group_builder.R
 \name{group_builder_server}
 \alias{group_builder_server}
-\title{Create group builder server}
+\title{Create group builder server logic}
 \usage{
 group_builder_server(
   id,
@@ -12,17 +12,98 @@ group_builder_server(
 )
 }
 \arguments{
-\item{id}{Character. The module ID}
+\item{id}{Character. The module ID matching the UI function}
 
-\item{selected_table_name}{Reactive. Selected table from table_picker}
+\item{selected_table_name}{Reactive expression returning the currently selected table name}
 
-\item{column_info}{Reactive. Column info list containing metadata and distinct values}
+\item{column_info}{Reactive expression returning a list with:
+\describe{
+\item{metadata}{Dataframe with column_name, column_type, etc.}
+\item{distinct_values}{Dataframe with column_name and value for categorical columns}
+}}
 
-\item{acceptable_dimensions}{Optional reactive. If provided, restricts groupable columns to this list}
+\item{acceptable_dimensions}{Optional reactive expression returning a character vector
+of column names to restrict the groupable columns. If NULL (default), all columns
+from the table are available for grouping.}
 }
 \value{
-List of reactive expressions containing grouping variables, banding configs, and regrouping configs
+A named list with three reactive expressions:
+\describe{
+\item{group_vars}{Reactive returning a character vector of selected column names
+to group by. Returns NULL or empty vector when no columns are selected.
+Example: c("cut", "color")}
+\item{banding_configs}{Reactive returning a named list of banding configurations
+for numeric columns. Each element is named by column and contains:
+\itemize{
+\item breaks: Numeric vector of breakpoint values (sorted and unique)
+\item labels: Character vector of band labels created from breaks
+}
+Returns empty list when no banding is configured.
+Example: list(carat = list(breaks = c(0.5, 1, 1.5),
+labels = c("<0.5", "[0.5,1)", "[1,1.5)", ">=1.5")))}
+\item{regrouping_configs}{Reactive returning a named list of regrouping configurations
+for categorical columns. Each element is named by column and contains:
+\itemize{
+\item mapping: Named list where names are original values and values are new group names
+\item group_unmapped_as_other: Logical indicating whether unmapped values should be grouped as "Other"
+}
+Returns empty list when no regrouping is configured.
+Example: list(cut = list(mapping = list("Ideal" = "Premium", "Premium" = "Premium",
+"Good" = "Standard", "Fair" = "Standard"),
+group_unmapped_as_other = TRUE))}
+}
 }
 \description{
-Create group builder server
+Server-side logic for the group builder module. This function manages column selection
+for grouping operations and provides advanced transformation options:
+
+\strong{Numeric Banding}: Converts continuous numeric columns into categorical bands using
+user-specified breakpoints. For example, age values can be banded into groups like
+"<18", "[18,30)", "[30,50)", ">=50".
+
+\strong{Category Regrouping}: Combines multiple categorical values into new groups. For
+example, regrouping colors "Red, Orange, Yellow" into "Warm Colors" and "Blue, Green"
+into "Cool Colors".
+
+The module automatically:
+\itemize{
+\item Updates available columns when the table changes
+\item Restricts columns based on acceptable_dimensions if provided
+\item Shows banding controls only for numeric columns
+\item Shows regrouping controls only for categorical columns
+\item Displays available categorical values to help with regrouping
+\item Validates user input for breakpoints and mappings
+}
+}
+\examples{
+\dontrun{
+server <- function(input, output, session) {
+  selected_table <- reactive("diamonds")
+  col_info <- reactive({
+    load_demo_column_info(selected_table())
+  })
+  
+  groups <- group_builder_server(
+    "my_groups",
+    selected_table,
+    col_info,
+    acceptable_dimensions = reactive(c("cut", "color", "clarity", "carat"))
+  )
+  
+  # Use the grouping configuration
+  grouped_data <- reactive({
+    group_cols <- groups$group_vars()
+    if (length(group_cols) > 0) {
+      tbl(pool, selected_table()) \%>\%
+        group_by(across(all_of(group_cols)))
+    } else {
+      tbl(pool, selected_table())
+    }
+  })
+}
+}
+
+}
+\seealso{
+\code{\link[=group_builder_ui]{group_builder_ui()}} for the UI components
 }

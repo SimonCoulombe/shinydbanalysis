@@ -7,11 +7,32 @@
 group_builder_ui(id)
 }
 \arguments{
-\item{id}{Character. The module ID}
+\item{id}{Character. The module ID used to create a unique namespace for this instance}
 }
 \value{
-A list of Shiny UI elements
+A Shiny tagList containing:
+\describe{
+\item{selectizeInput}{A multi-select dropdown for choosing grouping columns}
+\item{uiOutput}{A dynamic UI container that renders banding/regrouping controls
+based on the selected columns and their types}
+}
 }
 \description{
-Create group builder UI components
+Creates the user interface for the group builder module. This module allows users
+to select columns to group by and configure advanced grouping options such as:
+\itemize{
+\item Numeric banding - creating ranges from continuous numeric columns
+\item Category regrouping - combining categorical values into new groups
+}
+}
+\examples{
+\dontrun{
+ui <- fluidPage(
+  group_builder_ui("my_groups")
+)
+}
+
+}
+\seealso{
+\code{\link[=group_builder_server]{group_builder_server()}} for the server-side logic
 }

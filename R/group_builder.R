@@ -1,7 +1,30 @@
 #' Create group builder UI components
+#' 
+#' @description
+#' Creates the user interface for the group builder module. This module allows users
+#' to select columns to group by and configure advanced grouping options such as:
+#' \itemize{
+#'   \item Numeric banding - creating ranges from continuous numeric columns
+#'   \item Category regrouping - combining categorical values into new groups
+#' }
 #'
-#' @param id Character. The module ID
-#' @return A list of Shiny UI elements
+#' @param id Character. The module ID used to create a unique namespace for this instance
+#' 
+#' @return A Shiny tagList containing:
+#' \describe{
+#'   \item{selectizeInput}{A multi-select dropdown for choosing grouping columns}
+#'   \item{uiOutput}{A dynamic UI container that renders banding/regrouping controls
+#'     based on the selected columns and their types}
+#' }
+#' 
+#' @examples
+#' \dontrun{
+#' ui <- fluidPage(
+#'   group_builder_ui("my_groups")
+#' )
+#' }
+#' 
+#' @seealso [group_builder_server()] for the server-side logic
 #' @export
 group_builder_ui <- function(id) {
   ns <- NS(id)
@@ -22,13 +45,96 @@ group_builder_ui <- function(id) {
   )
 }
 
-#' Create group builder server
+#' Create group builder server logic
+#' 
+#' @description
+#' Server-side logic for the group builder module. This function manages column selection
+#' for grouping operations and provides advanced transformation options:
+#' 
+#' **Numeric Banding**: Converts continuous numeric columns into categorical bands using
+#' user-specified breakpoints. For example, age values can be banded into groups like
+#' "<18", "[18,30)", "[30,50)", ">=50".
+#' 
+#' **Category Regrouping**: Combines multiple categorical values into new groups. For
+#' example, regrouping colors "Red, Orange, Yellow" into "Warm Colors" and "Blue, Green"
+#' into "Cool Colors".
+#' 
+#' The module automatically:
+#' \itemize{
+#'   \item Updates available columns when the table changes
+#'   \item Restricts columns based on acceptable_dimensions if provided
+#'   \item Shows banding controls only for numeric columns
+#'   \item Shows regrouping controls only for categorical columns
+#'   \item Displays available categorical values to help with regrouping
+#'   \item Validates user input for breakpoints and mappings
+#' }
 #'
-#' @param id Character. The module ID
-#' @param selected_table_name Reactive. Selected table from table_picker
-#' @param column_info Reactive. Column info list containing metadata and distinct values
-#' @param acceptable_dimensions Optional reactive. If provided, restricts groupable columns to this list
-#' @return List of reactive expressions containing grouping variables, banding configs, and regrouping configs
+#' @param id Character. The module ID matching the UI function
+#' @param selected_table_name Reactive expression returning the currently selected table name
+#' @param column_info Reactive expression returning a list with:
+#'   \describe{
+#'     \item{metadata}{Dataframe with column_name, column_type, etc.}
+#'     \item{distinct_values}{Dataframe with column_name and value for categorical columns}
+#'   }
+#' @param acceptable_dimensions Optional reactive expression returning a character vector
+#'   of column names to restrict the groupable columns. If NULL (default), all columns
+#'   from the table are available for grouping.
+#'   
+#' @return A named list with three reactive expressions:
+#' \describe{
+#'   \item{group_vars}{Reactive returning a character vector of selected column names
+#'     to group by. Returns NULL or empty vector when no columns are selected.
+#'     Example: c("cut", "color")}
+#'   \item{banding_configs}{Reactive returning a named list of banding configurations
+#'     for numeric columns. Each element is named by column and contains:
+#'     \itemize{
+#'       \item breaks: Numeric vector of breakpoint values (sorted and unique)
+#'       \item labels: Character vector of band labels created from breaks
+#'     }
+#'     Returns empty list when no banding is configured.
+#'     Example: list(carat = list(breaks = c(0.5, 1, 1.5), 
+#'                                 labels = c("<0.5", "[0.5,1)", "[1,1.5)", ">=1.5")))}
+#'   \item{regrouping_configs}{Reactive returning a named list of regrouping configurations
+#'     for categorical columns. Each element is named by column and contains:
+#'     \itemize{
+#'       \item mapping: Named list where names are original values and values are new group names
+#'       \item group_unmapped_as_other: Logical indicating whether unmapped values should be grouped as "Other"
+#'     }
+#'     Returns empty list when no regrouping is configured.
+#'     Example: list(cut = list(mapping = list("Ideal" = "Premium", "Premium" = "Premium", 
+#'                                              "Good" = "Standard", "Fair" = "Standard"),
+#'                              group_unmapped_as_other = TRUE))}
+#' }
+#' 
+#' @examples
+#' \dontrun{
+#' server <- function(input, output, session) {
+#'   selected_table <- reactive("diamonds")
+#'   col_info <- reactive({
+#'     load_demo_column_info(selected_table())
+#'   })
+#'   
+#'   groups <- group_builder_server(
+#'     "my_groups",
+#'     selected_table,
+#'     col_info,
+#'     acceptable_dimensions = reactive(c("cut", "color", "clarity", "carat"))
+#'   )
+#'   
+#'   # Use the grouping configuration
+#'   grouped_data <- reactive({
+#'     group_cols <- groups$group_vars()
+#'     if (length(group_cols) > 0) {
+#'       tbl(pool, selected_table()) %>%
+#'         group_by(across(all_of(group_cols)))
+#'     } else {
+#'       tbl(pool, selected_table())
+#'     }
+#'   })
+#' }
+#' }
+#' 
+#' @seealso [group_builder_ui()] for the UI components
 #' @export
 group_builder_server <- function(id, selected_table_name, column_info, acceptable_dimensions = NULL) {
   
@@ -251,6 +357,151 @@ group_builder_server <- function(id, selected_table_name, column_info, acceptabl
   })
 }
 
+
+#' Demo app for group_builder module
+#' 
+#' @description
+#' Launches an interactive Shiny app demonstrating the group_builder module with
+#' the pre-packaged demo datasets (diamonds, iris, gapdata). Users can select a dataset,
+#' choose columns to group by, configure numeric banding and categorical regrouping,
+#' and see the returned values from the module.
+#' 
+#' The demo shows all three return values from group_builder_server():
+#' \itemize{
+#'   \item group_vars - The selected grouping columns
+#'   \item banding_configs - Numeric banding configurations (breaks and labels)
+#'   \item regrouping_configs - Categorical regrouping configurations (mappings)
+#' }
+#' 
+#' @return A Shiny app object (run interactively, no return value)
+#' 
+#' @examples
+#' \dontrun{
+#' # Launch the demo app
+#' group_builder_demo()
+#' }
+#' 
+#' @export
+group_builder_demo <- function() {
+  
+  pool <- get_demo_pool()
+  
+  ui <- fluidPage(
+    titlePanel("Group Builder Demo"),
+    
+    fluidRow(
+      column(
+        width = 6,
+        wellPanel(
+          h3("Dataset Selection"),
+          selectInput(
+            "table_select",
+            "Choose a dataset:",
+            choices = c("diamonds", "iris", "gapdata"),
+            selected = "diamonds"
+          ),
+          hr(),
+          h3("Grouping Configuration"),
+          group_builder_ui("demo_groups")
+        )
+      ),
+      column(
+        width = 6,
+        wellPanel(
+          h3("Module Return Values"),
+          p(style = "font-size: 0.9em; color: #666;", 
+            "Shows the three reactive values returned by group_builder_server()"),
+          verbatimTextOutput("module_returns")
+        )
+      )
+    )
+  )
+  
+  server <- function(input, output, session) {
+    
+    selected_table <- reactive({
+      req(input$table_select)
+      input$table_select
+    })
+    
+    column_info <- reactive({
+      req(selected_table())
+      load_demo_column_info(selected_table())
+    })
+    
+    groups <- group_builder_server(
+      "demo_groups",
+      selected_table,
+      column_info,
+      acceptable_dimensions = NULL
+    )
+    
+    output$module_returns <- renderPrint({
+      group_cols <- groups$group_vars()
+      banding <- groups$banding_configs()
+      regrouping <- groups$regrouping_configs()
+      
+      cat("=== group_vars (reactive) ===\n")
+      if (is.null(group_cols) || length(group_cols) == 0) {
+        cat("NULL or empty character vector\n")
+      } else {
+        cat("Character vector:\n")
+        print(group_cols)
+      }
+      
+      cat("\n=== banding_configs (reactive) ===\n")
+      if (length(banding) == 0) {
+        cat("Empty list (no banding configured)\n")
+      } else {
+        cat("Named list with", length(banding), "element(s):\n\n")
+        for (col_name in names(banding)) {
+          cat("$", col_name, "\n", sep = "")
+          cat("  $breaks: ", paste(banding[[col_name]]$breaks, collapse = ", "), "\n", sep = "")
+          cat("  $labels: ", paste(banding[[col_name]]$labels, collapse = " | "), "\n\n", sep = "")
+        }
+      }
+      
+      cat("=== regrouping_configs (reactive) ===\n")
+      if (length(regrouping) == 0) {
+        cat("Empty list (no regrouping configured)\n")
+      } else {
+        cat("Named list with", length(regrouping), "element(s):\n\n")
+        for (col_name in names(regrouping)) {
+          cat("$", col_name, "\n", sep = "")
+          cat("  $mapping:\n")
+          mapping <- regrouping[[col_name]]$mapping
+          for (orig_val in names(mapping)) {
+            cat("    '", orig_val, "' -> '", mapping[[orig_val]], "'\n", sep = "")
+          }
+          cat("  $group_unmapped_as_other: ", 
+              regrouping[[col_name]]$group_unmapped_as_other, "\n\n", sep = "")
+        }
+      }
+    })
+    
+    onStop(function() {
+      pool::poolClose(pool)
+    })
+  }
+  
+  shinyApp(ui, server)
+}
+
+
+
+#' Parse regrouping mapping from text input
+#' 
+#' @description
+#' Internal helper function that parses user-provided text into a mapping of
+#' original categorical values to new group names. The expected format is one
+#' mapping per line: "NewGroupName: value1, value2, value3"
+#' 
+#' @param mapping_text Character string with line-separated mappings
+#' 
+#' @return Named list where names are original values and values are new group names.
+#'   Returns empty list if parsing fails or no valid mappings found.
+#'   Example: list("Ideal" = "Premium", "Premium" = "Premium", "Good" = "Standard")
+#' @noRd
 parse_regrouping_mapping <- function(mapping_text) {
   lines <- strsplit(mapping_text, "\n")[[1]]
   lines <- lines[nzchar(trimws(lines))]
@@ -285,6 +536,17 @@ parse_regrouping_mapping <- function(mapping_text) {
   mapping
 }
 
+#' Create band labels from breakpoints
+#' 
+#' @description
+#' Internal helper function that generates human-readable labels for numeric bands
+#' created from breakpoints. Creates labels in the format: "<X", "[X,Y)", ">=Z"
+#' 
+#' @param breaks Numeric vector of breakpoint values (should be sorted and unique)
+#' 
+#' @return Character vector of band labels with length = length(breaks) + 1.
+#'   Example: For breaks = c(0.5, 1, 1.5), returns c("<0.5", "[0.5,1)", "[1,1.5)", ">=1.5")
+#' @noRd
 create_band_labels <- function(breaks) {
   n <- length(breaks)
   labels <- character(n + 1)
@@ -301,3 +563,4 @@ create_band_labels <- function(breaks) {
   
   labels
 }
+
