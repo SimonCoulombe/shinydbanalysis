@@ -12,17 +12,79 @@ filter_builder_server(
 )
 }
 \arguments{
-\item{id}{Character. The module ID}
+\item{id}{Character. The module ID matching the UI function}
 
-\item{storage_info}{List with storage configuration}
+\item{storage_info}{List with storage configuration containing:
+\describe{
+\item{storage_type}{Character. Either "local" or "adls"}
+\item{column_info_dir}{Character. Directory path for local storage}
+\item{adls_endpoint}{Character. Azure Data Lake Storage endpoint (for ADLS)}
+\item{adls_container}{Character. Container name (for ADLS)}
+\item{sas_token}{Character. SAS token for authentication (for ADLS)}
+}}
 
-\item{selected_table_name}{Reactive. Selected table name}
+\item{selected_table_name}{Reactive expression returning the currently selected table name}
 
-\item{restricted_columns}{Reactive. Columns to restrict}
+\item{restricted_columns}{Reactive expression or vector of column names to exclude from filtering}
 }
 \value{
-List of reactive expressions
+A named list with two reactive expressions:
+\describe{
+\item{where_clause}{Reactive returning a character string containing the SQL WHERE clause
+built from all active filters. Returns an empty string ("") when no filters are active.
+Multiple filter conditions are combined with " & " (AND operator).
+Example: "carat >= 0.5 & carat <= 1.5 & cut \%in\% c('Ideal', 'Premium')"}
+\item{current_filters}{Reactive returning a named list of all active filter module instances.
+Each element contains an 'id' and 'instance' with the filter's reactive values (column, type, value, etc.).
+Useful for debugging or accessing individual filter states.}
+}
 }
 \description{
-Create filter builder server logic
+Server-side logic for the filter builder module. This function manages multiple
+single_filter modules, allowing users to dynamically add and remove filters for
+different columns. It handles loading column metadata, tracking filter state,
+and building SQL WHERE clauses from active filters.
+
+The module automatically:
+\itemize{
+\item Loads column metadata from storage when the table changes
+\item Updates the dropdown to show only columns without active filters
+\item Preserves filter values when the UI re-renders
+\item Clears all filters when switching tables
+\item Generates SQL WHERE clauses from all active filters
+}
+}
+\examples{
+\dontrun{
+server <- function(input, output, session) {
+  selected_table <- reactive("diamonds")
+  
+  storage_info <- list(
+    storage_type = "local",
+    column_info_dir = "inst/extdata/column_info"
+  )
+  
+  filters <- filter_builder_server(
+    "my_filters",
+    storage_info,
+    selected_table,
+    restricted_columns = c("id", "timestamp")
+  )
+  
+  # Use the where_clause in a query
+  filtered_data <- reactive({
+    where <- filters$where_clause()
+    if (where != "") {
+      tbl(pool, selected_table()) \%>\%
+        filter(!!!rlang::parse_exprs(where))
+    } else {
+      tbl(pool, selected_table())
+    }
+  })
+}
+}
+
+}
+\seealso{
+\code{\link[=filter_builder_ui]{filter_builder_ui()}} for the UI components, \code{\link[=single_filter_server]{single_filter_server()}} for individual filter logic
 }

@@ -7,11 +7,33 @@
 filter_builder_ui(id)
 }
 \arguments{
-\item{id}{Character. The module ID}
+\item{id}{Character. The module ID used to create a unique namespace for this instance}
 }
 \value{
-A list of Shiny UI elements
+A list containing two Shiny UI elements:
+\describe{
+\item{selectInput}{A dropdown menu labeled "Add filter for column:" that shows available columns}
+\item{uiOutput}{A dynamic UI container that renders all active filter controls}
+}
 }
 \description{
-Create filter builder UI components
+Creates the user interface for the filter builder module. This module allows users
+to dynamically add, configure, and remove filters for different columns in a dataset.
+
+The UI consists of:
+\itemize{
+\item A dropdown menu to select which column to add a filter for
+\item A dynamic area that displays all active filters with their controls
+}
+}
+\examples{
+\dontrun{
+ui <- fluidPage(
+  filter_builder_ui("my_filters")
+)
+}
+
+}
+\seealso{
+\code{\link[=filter_builder_server]{filter_builder_server()}} for the server-side logic
 }
