@@ -358,3 +358,166 @@ build_filter_expression <- function(column_name, column_type, filter_value) {
            sprintf("%s %%in%% c(%s)", column_name, values_str)
          })
 }
+
+
+#' Demo app for filter_module
+#'
+#' @param use_real_data Logical. If TRUE, uses packaged demo data. If FALSE, uses synthetic examples.
+#' @return A Shiny app object
+#' @export
+#'
+#' @examples
+#' if (interactive()) {
+#'   filter_module_demo()
+#'   filter_module_demo(use_real_data = FALSE)
+#' }
+filter_module_demo <- function(use_real_data = TRUE) {
+  
+  ui <- fluidPage(
+    titlePanel("Filter Module Demo"),
+    
+    sidebarLayout(
+      sidebarPanel(
+        width = 4,
+        h3("Select Column to Filter"),
+        selectInput(
+          "column_choice",
+          "Choose a column:",
+          choices = NULL
+        ),
+        hr(),
+        h4("Filter Module:"),
+        uiOutput("filter_ui")
+      ),
+      
+      mainPanel(
+        width = 8,
+        h3("Module State"),
+        verbatimTextOutput("filter_state"),
+        hr(),
+        h3("Generated Filter Expression"),
+        verbatimTextOutput("filter_expression"),
+        hr(),
+        h3("Module Returns"),
+        verbatimTextOutput("module_returns")
+      )
+    )
+  )
+  
+  server <- function(input, output, session) {
+    
+    column_info_data <- reactive({
+      if (use_real_data) {
+        load_demo_column_info("diamonds")
+      } else {
+        list(
+          metadata = data.frame(
+            column_name = c("price", "cut", "date_purchased"),
+            column_type = c("numeric", "categorical", "date"),
+            min_value = c(100, NA, NA),
+            max_value = c(1000, NA, NA),
+            min_date = c(NA, NA, as.Date("2020-01-01")),
+            max_date = c(NA, NA, as.Date("2024-12-31")),
+            n_distinct = c(NA, 5, NA),
+            stringsAsFactors = FALSE
+          ),
+          distinct_values = data.frame(
+            column_name = rep("cut", 5),
+            value = c("Fair", "Good", "Very Good", "Premium", "Ideal"),
+            stringsAsFactors = FALSE
+          )
+        )
+      }
+    })
+    
+    observe({
+      col_info <- column_info_data()
+      choices <- setNames(
+        col_info$metadata$column_name,
+        paste0(col_info$metadata$column_name, " (", col_info$metadata$column_type, ")")
+      )
+      updateSelectInput(session, "column_choice", choices = choices)
+    })
+    
+    selected_column_data <- reactive({
+      req(input$column_choice)
+      col_info <- column_info_data()
+      
+      metadata <- col_info$metadata %>%
+        filter(column_name == input$column_choice) %>%
+        as.list()
+      
+      list(
+        metadata = metadata,
+        distinct_values = col_info$distinct_values
+      )
+    })
+    
+    filter_result <- reactive({
+      req(selected_column_data())
+      data <- selected_column_data()
+      
+      filter_module_server(
+        "demo_filter",
+        metadata = data$metadata,
+        distinct_values = data$distinct_values,
+        initial_value = NULL
+      )
+    })
+    
+    output$filter_ui <- renderUI({
+      req(selected_column_data())
+      data <- selected_column_data()
+      
+      filter_module_ui(
+        "demo_filter",
+        column_info = data,
+        initial_value = NULL
+      )
+    })
+    
+    output$filter_state <- renderPrint({
+      req(filter_result())
+      result <- filter_result()
+      
+      cat("Current Filter Value:\n")
+      print(result$value())
+      cat("\n")
+      cat("Is Active:", result$is_active(), "\n")
+      cat("Column:", result$column, "\n")
+      cat("Type:", result$type, "\n")
+    })
+    
+    output$filter_expression <- renderPrint({
+      req(filter_result())
+      result <- filter_result()
+      
+      expr <- build_filter_expression(
+        result$column,
+        result$type,
+        result$value()
+      )
+      
+      if (is.null(expr)) {
+        cat("No filter expression (empty filter)")
+      } else {
+        cat(expr)
+      }
+    })
+    
+    output$module_returns <- renderPrint({
+      req(filter_result())
+      result <- filter_result()
+      
+      cat("Module returns a list with:\n\n")
+      cat("$value: reactiveVal containing filter value\n")
+      cat("$remove: reactive tracking remove button (clicks:", 
+          if(is.null(result$remove())) 0 else result$remove(), ")\n")
+      cat("$column: '", result$column, "'\n", sep = "")
+      cat("$type: '", result$type, "'\n", sep = "")
+      cat("$is_active: reactiveVal (", result$is_active(), ")\n", sep = "")
+    })
+  }
+  
+  shinyApp(ui, server)
+}
