@@ -7,11 +7,38 @@
 summary_builder_ui(id)
 }
 \arguments{
-\item{id}{Character. The module ID}
+\item{id}{Character. The module ID used to create a unique namespace for this instance}
 }
 \value{
-A list of Shiny UI elements
+A Shiny tagList containing a well panel with:
+\describe{
+\item{checkboxInput}{Option to include record count in summary}
+\item{selectizeInput}{Multi-select for numeric columns to summarize}
+\item{selectInput}{Multi-select for summary functions (shown conditionally)}
+\item{group_builder_ui}{Embedded grouping controls for dimensions and transformations}
+}
 }
 \description{
-Create summary builder UI components
+Creates the user interface for the summary builder module. This module allows users
+to configure summary statistics and grouping operations for data analysis. It combines
+metric selection with the group_builder module for advanced grouping options.
+
+The UI consists of:
+\itemize{
+\item A checkbox to include record counts
+\item A multi-select for numeric columns to summarize
+\item A multi-select for summary functions (mean, sum, min, max)
+\item Embedded group_builder UI for grouping configuration
+}
+}
+\examples{
+\dontrun{
+ui <- fluidPage(
+  summary_builder_ui("my_summary")
+)
+}
+
+}
+\seealso{
+\code{\link[=summary_builder_server]{summary_builder_server()}} for the server-side logic, \code{\link[=group_builder_ui]{group_builder_ui()}} for grouping controls
 }

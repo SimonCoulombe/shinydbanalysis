@@ -2,20 +2,97 @@
 % Please edit documentation in R/summary_builder.R
 \name{summary_builder_server}
 \alias{summary_builder_server}
-\title{Create summary builder server}
+\title{Create summary builder server logic}
 \usage{
 summary_builder_server(id, selected_table_name, column_info)
 }
 \arguments{
-\item{id}{Character. The module ID}
+\item{id}{Character. The module ID matching the UI function}
 
-\item{selected_table_name}{Reactive. Selected table from table_picker}
+\item{selected_table_name}{Reactive expression returning the currently selected table name}
 
-\item{column_info}{Reactive. Column info list containing metadata and distinct values}
+\item{column_info}{Reactive expression returning a list with:
+\describe{
+\item{metadata}{Dataframe with column_name, column_type, etc.}
+\item{distinct_values}{Dataframe with column_name and value for categorical columns}
+}}
 }
 \value{
-List of reactive expressions containing summary specifications and grouping variables
+A named list with five reactive expressions:
+\describe{
+\item{summary_specs}{Reactive returning a list of summary specifications. Each spec
+is a list with elements:
+\itemize{
+\item metric: Column name to summarize (or "\emph{" for count)
+\item func: Function name ("count", "mean", "sum", "min", "max")
+\item sql: SQL function name (same as func, or "n" for count)
+}
+Returns empty list when no summary operations are configured.
+Example: list(
+list(metric = "}", func = "count", sql = "n"),
+list(metric = "price", func = "mean", sql = "mean"),
+list(metric = "price", func = "sum", sql = "sum")
+)}
+\item{group_vars}{Reactive returning a character vector of selected grouping column names,
+or NULL/empty vector when no grouping. Passed through from group_builder_server().
+Example: c("cut", "color")}
+\item{needs_summary}{Reactive returning a logical indicating whether any summary
+operations are configured (either count is enabled OR metrics with functions are selected).
+Used to determine if summarise() should be applied to the query.
+Example: TRUE}
+\item{banding_configs}{Reactive returning a named list of banding configurations
+for numeric grouping columns. Passed through from group_builder_server().
+Example: list(carat = list(breaks = c(0.5, 1, 1.5), labels = c("<0.5", "[0.5,1)", "[1,1.5)", ">=1.5")))}
+\item{regrouping_configs}{Reactive returning a named list of regrouping configurations
+for categorical grouping columns. Passed through from group_builder_server().
+Example: list(cut = list(mapping = list("Ideal" = "Premium"), group_unmapped_as_other = TRUE))}
+}
 }
 \description{
-Create summary builder server
+Server-side logic for the summary builder module. This function manages the configuration
+of summary statistics (aggregations) and grouping dimensions. It orchestrates:
+
+\itemize{
+\item Updating available numeric columns based on the selected table
+\item Building summary specifications from user selections
+\item Managing grouping configuration via the embedded group_builder module
+\item Determining whether summarization is needed
+}
+
+The module automatically:
+\itemize{
+\item Refreshes the metric choices when the table changes
+\item Creates summary specifications from metric-function combinations
+\item Passes through all group_builder return values (group_vars, banding, regrouping)
+\item Tracks whether any summarization operations are configured
+}
+}
+\examples{
+\dontrun{
+server <- function(input, output, session) {
+  selected_table <- reactive("diamonds")
+  col_info <- reactive({
+    load_demo_column_info(selected_table())
+  })
+  
+  summary <- summary_builder_server(
+    "my_summary",
+    selected_table,
+    col_info
+  )
+  
+  # Use the return values
+  observe({
+    if (summary$needs_summary()) {
+      specs <- summary$summary_specs()
+      groups <- summary$group_vars()
+      # Build query with these specifications...
+    }
+  })
+}
+}
+
+}
+\seealso{
+\code{\link[=summary_builder_ui]{summary_builder_ui()}} for the UI components, \code{\link[=group_builder_server]{group_builder_server()}} for grouping logic
 }
