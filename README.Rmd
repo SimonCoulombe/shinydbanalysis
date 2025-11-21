@@ -187,7 +187,7 @@ demo_shinydbanalysis_app(
 Here is an example of the content of the column_info parquet files :
 
 ```{r}
-
+library(shinydbanalysis)
 metadata_df <- read_column_info(
   tablename = "gapdata",
   storage_type = "local",
@@ -300,7 +300,8 @@ server <- function(input, output, session) {
   filter_results <- filter_builder_server(
     "filters",
     storage_info = storage_info,
-    selected_table_name = table_results$selected_table_name
+    selected_table_name = table_results$selected_table_name,
+    restricted_columns = character(0)
   )
   
   summary_results <- summary_builder_server(
@@ -309,13 +310,26 @@ server <- function(input, output, session) {
     column_info = current_column_info
   )
   
-  # Initialize data fetcher
+  # Build query by combining table, filters, and summaries
+  query_results <- query_builder_server(
+    "query_builder",
+    pool = pool,
+    selected_table_name = table_results$selected_table_name,
+    selected_tbl_ref_without_restricted_columns = table_results$selected_tbl_ref_without_restricted_columns,
+    where_clause = filter_results$where_clause,
+    needs_summary = summary_results$needs_summary,
+    group_vars = summary_results$group_vars,
+    summary_specs = summary_results$summary_specs,
+    banding_configs = summary_results$banding_configs,
+    regrouping_configs = summary_results$regrouping_configs
+  )
+  
+  # Fetch data using the built query
   fetched_data <- data_fetcher_server(
     "fetcher",
     pool = pool,
-    table_builder = table_results,
-    filter_builder = filter_results,
-    summary_builder = summary_results
+    query = query_results$query,
+    needs_summary = query_results$needs_summary
   )
   
   # Scatter plot of price vs carat

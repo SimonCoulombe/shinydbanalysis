@@ -45,94 +45,34 @@ own apps:
 devtools::install_github("SimonCoulombe/shinydbanalysis")
 ```
 
-# Quick Start: Built-in App “demo_shinydbanalysis_app” with Example Data
+# Quick Start: Built-in Demo Apps with Pre-Packaged Data
 
-## Data prep for example
+The package includes a pre-packaged DuckDB database (`demo.duckdb`) with
+three tables (diamonds, iris, gapdata) and their pre-computed column
+metadata. This means you can start exploring immediately **with zero
+setup**!
 
-some pre-work to create the “column-\_info” metadata and connect to a
-database
+## Instant Demo Apps
+
+Launch a full-featured demo app with **no configuration required**:
 
 ``` r
 library(shinydbanalysis)
-library(duckdb) # for local database example
-#> Loading required package: DBI
-library(pool)
-library(ggplot2)  # for the diamonds dataset
-library(gapminder) # for gapminder dataset 
-library(arrow) # we save as parquet files  
-#> 
-#> Attaching package: 'arrow'
-#> The following object is masked from 'package:utils':
-#> 
-#>     timestamp
-library(dplyr) 
-#> 
-#> Attaching package: 'dplyr'
-#> The following objects are masked from 'package:stats':
-#> 
-#>     filter, lag
-#> The following objects are masked from 'package:base':
-#> 
-#>     intersect, setdiff, setequal, union
-library(AzureStor) # we can save column info to ADLS directly instead of local hardrive for deployment on servers
+library(bslib)
+# Full demo app with all features
+demo_shinydbanalysis_app(pool = get_demo_pool(), storage_info = get_demo_storage_info())
 
-gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01")))  %>% mutate(prout = NA_character_)
-# Create a DuckDB connection pool (in-memory database) 
-# this represents the SQL server you are going to connect to.
-pool <- dbPool(
-  drv = duckdb::duckdb(),
-  dbdir = ":memory:"
-)
-
-# Load some example datasets
-dbWriteTable(pool, SQL("diamonds"), ggplot2::diamonds)    # using the SQL() functions helps when trying to write a table to a schema, and doesnt hurt otherwise.
-dbWriteTable(pool, SQL("iris"), iris)
-dbWriteTable(pool, SQL("gapdata"), gapdata)
-
-
-# Generate column information for each table
-create_column_info("diamonds", pool)
-#> Getting column types...
-#> Processing 7 numeric columns...
-#> Processing batch: carat, depth, table, price, x, y, z
-#> Processing 0 date columns...
-#> Processing 3 categorical columns...
-#> Processing batch: cut, color, clarity
-#> Getting distinct values for: cut
-#> Getting distinct values for: color
-#> Getting distinct values for: clarity
-#> Column info saved to: column_info
-create_column_info("iris", pool)
-#> Getting column types...
-#> Processing 4 numeric columns...
-#> Processing batch: Sepal.Length, Sepal.Width, Petal.Length, Petal.Width
-#> Processing 0 date columns...
-#> Processing 1 categorical columns...
-#> Processing batch: Species
-#> Getting distinct values for: Species
-#> Column info saved to: column_info
-create_column_info("gapdata", pool)
-#> Getting column types...
-#> Processing 4 numeric columns...
-#> Processing batch: year, lifeExp, pop, gdpPercap
-#> Processing 1 date columns...
-#> Processing batch: date
-#> Processing 3 categorical columns...
-#> Processing batch: country, continent, prout
-#> Getting distinct values for: country
-#> Getting distinct values for: continent
-#> Column info saved to: column_info
+# OR use the simplified all-in-one module version
+demo_shinydbanalysis_app_all_in_one_module(pool = get_demo_pool(), storage_info = get_demo_storage_info())
 ```
 
-## Demo app (local storage type)
+That’s it! The apps will automatically:
 
-``` r
-shinydbanalysis::demo_shinydbanalysis_app(
-  pool = pool,
-  storage_type = "local",
-  column_info_dir = "column_info"
-)
-```
+- Connect to the pre-packaged `demo.duckdb` database (located in
+  `inst/extdata/`)
+- Load pre-computed column metadata from `inst/extdata/column_info/`
+- Give you access to three tables: **diamonds**, **iris**, and
+  **gapdata**
 
 Screenshot of the app after fetching some data:  
 ![Dataset Analysis Tool](man/figures/readme1.png)
@@ -148,43 +88,115 @@ Screenshot of the app in the “debug information” tab:
 <figcaption aria-hidden="true">Dataset Analysis Tool</figcaption>
 </figure>
 
-## Demo : Launch the all-in-one module Demo app (local storage type)
+## Individual Module Demos
+
+You can also try out individual modules to understand each component:
 
 ``` r
-library(bslib)
-storage_info <- list(
-  storage_type = "local",
-  column_info_dir = "column_info"
-)
-restricted_columns <- character(0)
-demo_shinydbanalysis_app_all_in_one_module(pool, storage_info, restricted_columns)
+# Demo individual modules
+single_filter_demo()      # Single column filter with different types
+filter_builder_demo()     # Multiple filters working together
+group_builder_demo()      # Grouping with banding and regrouping
+summary_builder_demo()    # Summary statistics configuration
 ```
 
-## Demo: Use ADLS (azure data lake storage) to store column-info
+These smaller demos help you understand how each module works before
+building your own custom app.
 
-Useful if you are hosting you app on Posit Connect instead of locally.
+------------------------------------------------------------------------
+
+# Creating Your Own Database and Column Info
+
+To use the package with your own database, you need to:
+
+1.  **Create a database connection pool**
+2.  **Generate column metadata** using `create_column_info()`
+
+## Example: Setting Up Your Own Data
 
 ``` r
+library(shinydbanalysis)
+library(duckdb)
+library(pool)
+library(ggplot2)
+library(dplyr)
 
-# ADLS version
+# Create a DuckDB connection pool
+pool <- dbPool(
+  drv = duckdb::duckdb(),
+  dbdir = ":memory:"  # or path to a file: "my_database.duckdb"
+)
+
+# Load your datasets
+dbWriteTable(pool, "diamonds", ggplot2::diamonds)
+dbWriteTable(pool, "iris", iris)
+
+# Create directory for column metadata
+dir.create("column_info", showWarnings = FALSE)
+
+# Generate column information for each table
+# This pre-computes column types, distinct values, etc.
+create_column_info("diamonds", pool, 
+                   storage_type = "local",
+                   column_info_dir = "column_info")
+
+create_column_info("iris", pool,
+                   storage_type = "local", 
+                   column_info_dir = "column_info")
+
+
+# Create storage info configuration
+storage_info <- list(
+  storage_type = "local",
+  column_info_dir = "column_info",
+  adls_endpoint = NULL,
+  adls_container = NULL,
+  sas_token = NULL
+)
+
+
+# Now launch the app with your data
+demo_shinydbanalysis_app(
+  pool = pool,
+  storage_info  = storage_info
+)
+```
+
+## Using ADLS (Azure Data Lake Storage) for Column Info
+
+If hosting your app on Posit Connect or other cloud platforms, you can
+store column info in Azure Data Lake Storage:
+
+``` r
+# Create column info and store in ADLS
 shinydbanalysis::create_column_info(
   tablename = "myschema.iris", 
   pool = pool,
   storage_type = "adls",
   column_info_dir = "column_info",
   adls_endpoint = "https://myadlsenpoint.blob.core.windows.net/", 
-  adls_container =Sys.getenv("adls_container"),
+  adls_container = Sys.getenv("adls_container"),
   sas_token = Sys.getenv("sas_token_dev"))
 
 
-demo_shinydbanalysis_app(
-  pool = pool,
+
+# Create storage info configuration
+storage_info <- list(
   storage_type = "adls",
-  column_info_dir = "column_info", 
+  column_info_dir = "column_info",
   adls_endpoint = "https://myadlsenpoint.blob.core.windows.net/", 
-  adls_container =Sys.getenv("adls_container"),
+  adls_container = Sys.getenv("adls_container"),
   sas_token = Sys.getenv("sas_token_dev"))
 )
+
+
+
+# Launch demo app with ADLS storage
+demo_shinydbanalysis_app(
+  pool = pool,
+  storage_info = storage_info
+)
+  
 ```
 
 ## column_info metadata
@@ -192,7 +204,7 @@ demo_shinydbanalysis_app(
 Here is an example of the content of the column_info parquet files :
 
 ``` r
-
+library(shinydbanalysis)
 metadata_df <- read_column_info(
   tablename = "gapdata",
   storage_type = "local",
@@ -238,10 +250,20 @@ parameter. Here we will remove ‘continent’. It wont be available for
 filtereding/grouping and wont be fetched.
 
 ``` r
-demo_shinydbanalysis_app(
-  pool = pool,
+storage_info <- list(
   storage_type = "local",
   column_info_dir = "column_info",
+  adls_endpoint = NULL,
+  adls_container = NULL,
+  sas_token = NULL
+)
+
+
+
+
+demo_shinydbanalysis_app(
+  pool = pool,
+  storage_info = storage_info,
   restricted_columns = c("continent")
 )
 ```
@@ -326,7 +348,8 @@ server <- function(input, output, session) {
   filter_results <- filter_builder_server(
     "filters",
     storage_info = storage_info,
-    selected_table_name = table_results$selected_table_name
+    selected_table_name = table_results$selected_table_name,
+    restricted_columns = character(0)
   )
   
   summary_results <- summary_builder_server(
@@ -335,13 +358,26 @@ server <- function(input, output, session) {
     column_info = current_column_info
   )
   
-  # Initialize data fetcher
+  # Build query by combining table, filters, and summaries
+  query_results <- query_builder_server(
+    "query_builder",
+    pool = pool,
+    selected_table_name = table_results$selected_table_name,
+    selected_tbl_ref_without_restricted_columns = table_results$selected_tbl_ref_without_restricted_columns,
+    where_clause = filter_results$where_clause,
+    needs_summary = summary_results$needs_summary,
+    group_vars = summary_results$group_vars,
+    summary_specs = summary_results$summary_specs,
+    banding_configs = summary_results$banding_configs,
+    regrouping_configs = summary_results$regrouping_configs
+  )
+  
+  # Fetch data using the built query
   fetched_data <- data_fetcher_server(
     "fetcher",
     pool = pool,
-    table_builder = table_results,
-    filter_builder = filter_results,
-    summary_builder = summary_results
+    query = query_results$query,
+    needs_summary = query_results$needs_summary
   )
   
   # Scatter plot of price vs carat
@@ -411,11 +447,15 @@ create_column_info(
   column_info_dir = "column_info"
 )
 
+storage_info <-  list(
+  storage_type = "local",
+  column_info_dir = "column_info"
+)
+
 # Launch the app with explicit storage configuration
 demo_shinydbanalysis_app(
   pool = pool,
-  storage_type = "local",
-  column_info_dir = "column_info"
+  storage_info = storage_info
 )
 ```
 
