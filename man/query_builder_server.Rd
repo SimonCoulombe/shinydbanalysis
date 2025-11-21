@@ -47,7 +47,7 @@ A list with three reactive expressions:
 }
 }
 \description{
-Builds a complete dbplyr query by combining filters, grouping, transformations (banding/regrouping),
+Builds a complete dbplyr tbl() query by combining filters, grouping, transformations (banding/regrouping),
 and summarization specifications.
 }
 \details{

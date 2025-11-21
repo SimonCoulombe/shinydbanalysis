@@ -1,7 +1,7 @@
 
 #' Create query builder server logic
 #'
-#' Builds a complete dbplyr query by combining filters, grouping, transformations (banding/regrouping),
+#' Builds a complete dbplyr tbl() query by combining filters, grouping, transformations (banding/regrouping),
 #' and summarization specifications. 
 #'
 #' @param id Character. The module ID
@@ -34,7 +34,17 @@
 #' All operations use dbplyr, so the query remains lazy until explicitly collected.
 #'
 #' @export
-query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref_without_restricted_columns, where_clause, needs_summary, group_vars, summary_specs, banding_configs = NULL, regrouping_configs = NULL) {
+query_builder_server <- function(id,
+                                 pool, 
+                                 selected_table_name,
+                                 selected_tbl_ref_without_restricted_columns, 
+                                 where_clause, 
+                                 needs_summary,
+                                 group_vars,
+                                 summary_specs, 
+                                 banding_configs = NULL,
+                                 regrouping_configs = NULL
+                                 ) {
   moduleServer(id, function(input, output, session) {
     # State management
     error_state <- reactiveVal(NULL)

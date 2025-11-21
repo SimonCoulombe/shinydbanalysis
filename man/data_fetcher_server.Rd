@@ -25,6 +25,7 @@ A list with three reactive expressions:
 }
 \description{
 Executes database queries when the user clicks "Fetch Data" and manages the results.
+This query is typically created by query_builder_server(), which combined the outputs of the filter_builder and summary_builder()
 Shows a warning when fetching unsummarized data and provides SQL preview on hover.
 }
 \details{
