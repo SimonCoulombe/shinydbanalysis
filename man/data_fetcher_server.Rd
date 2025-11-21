@@ -11,13 +11,32 @@ data_fetcher_server(id, pool, query, needs_summary)
 
 \item{pool}{Database connection pool}
 
-\item{query}{Reactive expression for the built query}
+\item{query}{Reactive expression returning a dbplyr query object (lazy tbl)}
 
-\item{needs_summary}{Reactive expression for needs summary flag}
+\item{needs_summary}{Reactive expression returning a logical indicating if data will be summarized}
 }
 \value{
-List of reactive expressions
+A list with three reactive expressions:
+\describe{
+\item{data}{Reactive returning a data.frame or tibble with the fetched results, or NULL if no data has been fetched yet}
+\item{error}{Reactive returning a character string with error message, or NULL if no error occurred}
+\item{executed_query}{Reactive returning the SQL query text that was executed as a character string, or "" if nothing has been executed yet}
+}
 }
 \description{
-Create data fetcher server logic
+Executes database queries when the user clicks "Fetch Data" and manages the results.
+Shows a warning when fetching unsummarized data and provides SQL preview on hover.
+}
+\details{
+The module executes the query lazily - it only fetches data when the user clicks the "Fetch Data" button.
+This is important because the query may return a large amount of data.
+
+When \code{needs_summary()} is FALSE (indicating the user wants all records, not aggregated data),
+a warning message is displayed to alert the user that fetching may take time.
+}
+\examples{
+# See data_fetcher_demo() for a complete working example
+if (interactive()) {
+  data_fetcher_demo()
+}
 }

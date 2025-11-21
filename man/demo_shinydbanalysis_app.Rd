@@ -23,6 +23,6 @@ No arguments are required for the demo - just call \code{demo_shinydbanalysis_ap
 \examples{
 # Zero-configuration demo using pre-packaged data
 if (interactive()) {
-  demo_shinydbanalysis_app(pool = get_demo_pool(), column_info_dir =  get_demo_column_info_path())
+  demo_shinydbanalysis_app(pool = get_demo_pool(), storage_info = get_demo_storage_info())
 }
 }

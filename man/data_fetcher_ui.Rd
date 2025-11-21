@@ -7,13 +7,31 @@
 data_fetcher_ui(id, style = "hover")
 }
 \arguments{
-\item{id}{Character. The module ID}
+\item{id}{Character. The module ID used to namespace the UI elements}
 
-\item{style}{Character. Either "collapsible" or "hover" for the preview display style}
+\item{style}{Character. Display style for SQL preview:
+\itemize{
+\item "hover" (default): Preview appears when hovering over the button area
+\item "collapsible": Preview can be toggled with a "Show SQL Preview" link
+}}
 }
 \value{
-A Shiny UI element
+A Shiny UI element (tagList) containing the fetch button, SQL preview, and warning message placeholder
 }
 \description{
-Create data fetcher UI components
+Creates the user interface for fetching data from a database query. Displays a "Fetch Data" button
+with an optional SQL preview (either on hover or collapsible). Also shows a warning message
+when fetching unsummarized data that may return many records.
+}
+\details{
+The "hover" style is recommended for most use cases as it provides quick access to the SQL preview
+without cluttering the UI. The "collapsible" style is useful when screen space is limited.
+}
+\examples{
+# In a Shiny UI
+if (interactive()) {
+  ui <- fluidPage(
+    data_fetcher_ui("fetcher", style = "hover")
+  )
+}
 }

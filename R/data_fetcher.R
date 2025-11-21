@@ -1,9 +1,31 @@
 #' Create data fetcher UI components
 #'
-#' @param id Character. The module ID
-#' @param style Character. Either "collapsible" or "hover" for the preview display style
-#' @return A Shiny UI element
+#' Creates the user interface for fetching data from a database query. Displays a "Fetch Data" button
+#' with an optional SQL preview (either on hover or collapsible). Also shows a warning message
+#' when fetching unsummarized data that may return many records.
+#'
+#' @param id Character. The module ID used to namespace the UI elements
+#' @param style Character. Display style for SQL preview:
+#'   \itemize{
+#'     \item "hover" (default): Preview appears when hovering over the button area
+#'     \item "collapsible": Preview can be toggled with a "Show SQL Preview" link
+#'   }
+#'
+#' @return A Shiny UI element (tagList) containing the fetch button, SQL preview, and warning message placeholder
+#'
+#' @details
+#' The "hover" style is recommended for most use cases as it provides quick access to the SQL preview
+#' without cluttering the UI. The "collapsible" style is useful when screen space is limited.
+#'
 #' @export
+#'
+#' @examples
+#' # In a Shiny UI
+#' if (interactive()) {
+#'   ui <- fluidPage(
+#'     data_fetcher_ui("fetcher", style = "hover")
+#'   )
+#' }
 data_fetcher_ui <- function(id, style = "hover") {
   ns <- NS(id)
   
@@ -91,12 +113,36 @@ data_fetcher_ui <- function(id, style = "hover") {
 
 
 #' Create data fetcher server logic
+#'
+#' Executes database queries when the user clicks "Fetch Data" and manages the results.
+#' Shows a warning when fetching unsummarized data and provides SQL preview on hover.
+#'
 #' @param id Character. The module ID
 #' @param pool Database connection pool
-#' @param query Reactive expression for the built query
-#' @param needs_summary Reactive expression for needs summary flag
-#' @return List of reactive expressions
+#' @param query Reactive expression returning a dbplyr query object (lazy tbl)
+#' @param needs_summary Reactive expression returning a logical indicating if data will be summarized
+#'
+#' @return A list with three reactive expressions:
+#' \describe{
+#'   \item{data}{Reactive returning a data.frame or tibble with the fetched results, or NULL if no data has been fetched yet}
+#'   \item{error}{Reactive returning a character string with error message, or NULL if no error occurred}
+#'   \item{executed_query}{Reactive returning the SQL query text that was executed as a character string, or "" if nothing has been executed yet}
+#' }
+#'
+#' @details
+#' The module executes the query lazily - it only fetches data when the user clicks the "Fetch Data" button.
+#' This is important because the query may return a large amount of data.
+#'
+#' When `needs_summary()` is FALSE (indicating the user wants all records, not aggregated data),
+#' a warning message is displayed to alert the user that fetching may take time.
+#'
 #' @export
+#'
+#' @examples
+#' # See data_fetcher_demo() for a complete working example
+#' if (interactive()) {
+#'   data_fetcher_demo()
+#' }
 data_fetcher_server <- function(id, pool, query, needs_summary) {
   moduleServer(id, function(input, output, session) {
     # State management
@@ -168,100 +214,17 @@ data_fetcher_server <- function(id, pool, query, needs_summary) {
 }
 
 
-#' Create query builder server logic
-#' @param id Character. The module ID
-#' @param pool Database connection pool
-#' @param selected_table_name Reactive expression for selected table name
-#' @param selected_tbl_ref_without_restricted_columns Reactive expression for table reference without restricted columns
-#' @param where_clause Reactive expression for where clause
-#' @param needs_summary Reactive expression for needs summary flag
-#' @param group_vars Reactive expression for group variables
-#' @param summary_specs Reactive expression for summary specifications
-#' @param group_vars Reactive expression for grouping variables
-#' @param summary_specs Reactive expression for summary specifications
-#' @param banding_configs Reactive expression for numeric banding configurations
-#' @param regrouping_configs Reactive expression for categorical regrouping configurations
-#' @return List containing reactive expressions for the built query and needs_summary
-#' @export
-query_builder_server <- function(id, pool, selected_table_name, selected_tbl_ref_without_restricted_columns, where_clause, needs_summary, group_vars, summary_specs, banding_configs = NULL, regrouping_configs = NULL) {
-  moduleServer(id, function(input, output, session) {
-    # State management
-    error_state <- reactiveVal(NULL)
-    
-    # Build query using dbplyr
-    query <- reactive({
-      table <- selected_table_name()
-      
-      if (is.null(table) || !nzchar(table)) {
-        return(NULL)
-      }
-      
-      tryCatch({
-        # Get base table reference
-        query <- selected_tbl_ref_without_restricted_columns()
-        
-        # Apply filters if any
-        if (!is.null(where_clause() ) && nzchar(where_clause())) {
-          filter_expr <- parse_filter_expression(where_clause())
-          query <- filter(query, !!filter_expr)
-        }
-        
-        # Apply banding transformations before grouping
-        if (!is.null(banding_configs) && length(banding_configs()) > 0) {
-          for (var_name in names(banding_configs())) {
-            config <- banding_configs()[[var_name]]
-            band_expr <- create_banding_expression(var_name, config)
-            query <- mutate(query, !!sym(var_name) := !!band_expr)
-          }
-        }
-        
-        # Apply regrouping transformations before grouping
-        if (!is.null(regrouping_configs) && length(regrouping_configs()) > 0) {
-          for (var_name in names(regrouping_configs())) {
-            config <- regrouping_configs()[[var_name]]
-            regroup_expr <- create_regrouping_expression(var_name, config)
-            query <- mutate(query, !!sym(var_name) := !!regroup_expr)
-          }
-        }
-        
-        # Only apply summarization if specifically requested
-        if (needs_summary()) {
-          # Get grouping variables if any
-          if (length(group_vars()) > 0) {
-            query <- group_by(query, !!!syms(group_vars()))
-          }
-          
-          # Apply summary specifications
-          if (length(summary_specs()) > 0) {
-            summary_exprs <- build_summary_expressions(summary_specs())
-            if (length(summary_exprs) > 0) {
-              query <- summarise(query, !!!summary_exprs)
-            }
-          }
-        }
-        
-        query
-        
-      }, error = function(e) {
-        error_state(paste("Error building query:", e$message))
-        NULL
-      })
-    })
-    
-    # Return interface
-    list(
-      query = reactive(query()),
-      needs_summary = reactive(needs_summary()),
-      error = reactive(error_state())
-    )
-  })
-}
 
 # Helper Functions ----
 
 #' Convert dbplyr query to SQL text
-#' @param query dbplyr query object
-#' @return Character string containing the SQL query or status message
+#'
+#' Converts a dbplyr lazy table object to its SQL representation as text.
+#' Used to show users the SQL query that will be executed.
+#'
+#' @param query A dbplyr query object (lazy tbl), or NULL
+#' @return Character string containing the SQL query, or a status message if query is NULL or an error occurs
+#'
 #' @noRd
 get_sql_text <- function(query) {
   if (is.null(query)) {
@@ -273,102 +236,4 @@ get_sql_text <- function(query) {
       paste("Error generating SQL:", e$message)
     })
   }
-}
-
-#' Parse filter expression from WHERE clause
-#' @param where_clause Character string containing the filter conditions
-#' @return Parsed expression for dplyr filter
-#' @noRd
-parse_filter_expression <- function(where_clause) {
-  # Convert SQL-like syntax to R expression
-  expr <- where_clause %>%
-    # Keep %in% as is (it's already R syntax)
-    gsub(" AND ", " & ", ., fixed = TRUE) %>%
-    gsub(" OR ", " | ", ., fixed = TRUE)
-  
-  rlang::parse_expr(expr)
-}
-
-#' Build summary expressions for dplyr summarise
-#' @param summary_specs List of summary specifications
-#' @return List of quoted expressions for summarise
-#' @noRd
-build_summary_expressions <- function(summary_specs) {
-  summary_exprs <- list()
-  
-  for (spec in summary_specs) {
-    if (spec$func == "count") {
-      summary_exprs$record_count <- quo(n())
-    } else {
-      # Build expression like mean(price), sum(quantity), etc.
-      expr <- call(spec$func, sym(spec$metric))
-      name <- paste0(spec$func, "_", spec$metric)
-      summary_exprs[[name]] <- quo(!!expr)
-    }
-  }
-  
-  summary_exprs
-}
-
-#' Create banding expression for numeric variables
-#' @param var_name Character string with the variable name
-#' @param config List with breaks and labels
-#' @return Quoted expression for case_when
-#' @noRd
-create_banding_expression <- function(var_name, config) {
-  breaks <- config$breaks
-  labels <- config$labels
-  n <- length(breaks)
-  
-  conditions <- list()
-  
-  conditions[[1]] <- quo(!!sym(var_name) < !!breaks[1] ~ !!labels[1])
-  
-  if (n > 1) {
-    for (i in seq_len(n - 1)) {
-      conditions[[i + 1]] <- quo(!!sym(var_name) >= !!breaks[i] & !!sym(var_name) < !!breaks[i + 1] ~ !!labels[i + 1])
-    }
-  }
-  
-  conditions[[n + 1]] <- quo(!!sym(var_name) >= !!breaks[n] ~ !!labels[n + 1])
-  
-  quo(case_when(!!!conditions))
-}
-
-#' Create regrouping expression for categorical variables
-#' @param var_name Character string with the variable name
-#' @param config List with mapping and group_unmapped_as_other flag
-#' @return Quoted expression for case_when
-#' @noRd
-create_regrouping_expression <- function(var_name, config) {
-  # Handle legacy format (plain mapping) or new format (list with mapping + flag)
-  if (is.null(config$mapping)) {
-    # Legacy format: config is the mapping itself
-    mapping <- config
-    group_unmapped_as_other <- FALSE
-  } else {
-    # New format: config has mapping and group_unmapped_as_other
-    mapping <- config$mapping
-    group_unmapped_as_other <- isTRUE(config$group_unmapped_as_other)
-  }
-  
-  if (length(mapping) == 0) {
-    return(quo(!!sym(var_name)))
-  }
-  
-  conditions <- list()
-  
-  for (original_value in names(mapping)) {
-    new_group <- mapping[[original_value]]
-    conditions[[length(conditions) + 1]] <- quo(!!sym(var_name) == !!original_value ~ !!new_group)
-  }
-  
-  # Add a default case: either "Other" or keep original values
-  if (group_unmapped_as_other) {
-    conditions[[length(conditions) + 1]] <- quo(TRUE ~ "Other")
-  } else {
-    conditions[[length(conditions) + 1]] <- quo(TRUE ~ !!sym(var_name))
-  }
-  
-  quo(case_when(!!!conditions))
 }
