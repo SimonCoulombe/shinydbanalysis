@@ -216,21 +216,28 @@ mod_navpanel_shinydbanalysis_server <- function(id, pool, storage_info, restrict
   })
 }
 
-#' demo_shinydbanalysis_app_all_in_one_module
+#' Run All-in-One Module Demo App
 #'
-#' @param pool 
-#' @param storage_info 
-#' @param restricted_columns 
+#' Launches a simplified demo app using a single reusable module with the pre-packaged demo database by default.
+#' No arguments are required for the demo - just call `demo_shinydbanalysis_app_all_in_one_module()`.
 #'
+#' @param pool A database connection pool object. 
+#' @param storage_info A list with storage configuration. 
+#' @param restricted_columns Character vector of column names to restrict from user access. Defaults to none.
+#'
+#' @return A Shiny app object
 #' @export
 #'
 #' @examples
-#' library(bslib)
-#' storage_info <- list(  storage_type = "local",column_info_dir = "column_info")
-#' restricted_columns <- character(0)
-#' demo_shinydbanalysis_app_all_in_one_module(pool, storage_info, restricted_columns)
-
-demo_shinydbanalysis_app_all_in_one_module <-function(pool, storage_info, restricted_columns){
+#' # Zero-configuration demo using pre-packaged data
+#' if (interactive()) {
+#'   library(bslib)
+#'   demo_shinydbanalysis_app_all_in_one_module(pool = get_demo_pool(), storage_info = get_demo_storage_info())
+#' }
+#'
+demo_shinydbanalysis_app_all_in_one_module <- function(pool, 
+                                                        storage_info, 
+                                                        restricted_columns = character(0)) {
   
   ui <- page_navbar(
     title = "Dataset Analysis Tool",

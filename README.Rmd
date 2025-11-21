@@ -38,52 +38,29 @@ The {shinydbanalysis} offer the following modules you can use in your own apps:
 devtools::install_github("SimonCoulombe/shinydbanalysis")
 ```
 
-# Quick Start: Built-in App "demo_shinydbanalysis_app" with Example Data
+# Quick Start: Built-in Demo Apps with Pre-Packaged Data
 
+The package includes a pre-packaged DuckDB database (`demo.duckdb`) with three tables (diamonds, iris, gapdata) and their pre-computed column metadata. This means you can start exploring immediately **with zero setup**!
 
-## Data prep for example  
+## Instant Demo Apps
 
+Launch a full-featured demo app with **no configuration required**:
 
-some pre-work to create the "column-_info" metadata and connect to a database
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 library(shinydbanalysis)
-library(duckdb) # for local database example
-library(pool)
-library(ggplot2)  # for the diamonds dataset
-library(gapminder) # for gapminder dataset 
-library(arrow) # we save as parquet files  
-library(dplyr) 
-library(AzureStor) # we can save column info to ADLS directly instead of local hardrive for deployment on servers
+library(bslib)
+# Full demo app with all features
+demo_shinydbanalysis_app(pool = get_demo_pool(), storage_info = get_demo_storage_info())
 
-gapdata <- gapminder::gapminder %>%  mutate(date = as.Date(paste0(year, "-01-01")))  %>% mutate(prout = NA_character_)
-# Create a DuckDB connection pool (in-memory database) 
-# this represents the SQL server you are going to connect to.
-pool <- dbPool(
-  drv = duckdb::duckdb(),
-  dbdir = ":memory:"
-)
-
-# Load some example datasets
-dbWriteTable(pool, SQL("diamonds"), ggplot2::diamonds)    # using the SQL() functions helps when trying to write a table to a schema, and doesnt hurt otherwise.
-dbWriteTable(pool, SQL("iris"), iris)
-dbWriteTable(pool, SQL("gapdata"), gapdata)
-
-
-# Generate column information for each table
-create_column_info("diamonds", pool)
-create_column_info("iris", pool)
-create_column_info("gapdata", pool)
-
-```
-##  Demo app (local storage type)   
-```{r, eval= FALSE}
-shinydbanalysis::demo_shinydbanalysis_app(
-  pool = pool,
-  storage_type = "local",
-  column_info_dir = "column_info"
-)
+# OR use the simplified all-in-one module version
+demo_shinydbanalysis_app_all_in_one_module(pool = get_demo_pool(), storage_info = get_demo_storage_info())
 ```
 
+That's it! The apps will automatically:
+
+* Connect to the pre-packaged `demo.duckdb` database (located in `inst/extdata/`)
+* Load pre-computed column metadata from `inst/extdata/column_info/`
+* Give you access to three tables: **diamonds**, **iris**, and **gapdata**
 
 Screenshot of the app after fetching some data:  
 ![Dataset Analysis Tool](man/figures/readme1.png)
@@ -95,43 +72,113 @@ Screenshot of the app in the "debug information" tab:
 
 ![Dataset Analysis Tool](man/figures/readme3.png)
 
-## Demo : Launch the all-in-one module Demo app (local storage type)   
+## Individual Module Demos
+
+You can also try out individual modules to understand each component:
 
 ```{r, eval = FALSE}
-library(bslib)
-storage_info <- list(
-  storage_type = "local",
-  column_info_dir = "column_info"
-)
-restricted_columns <- character(0)
-demo_shinydbanalysis_app_all_in_one_module(pool, storage_info, restricted_columns)
+# Demo individual modules
+single_filter_demo()      # Single column filter with different types
+filter_builder_demo()     # Multiple filters working together
+group_builder_demo()      # Grouping with banding and regrouping
+summary_builder_demo()    # Summary statistics configuration
 ```
 
-## Demo: Use ADLS (azure data lake storage) to store column-info   
+These smaller demos help you understand how each module works before building your own custom app.
 
- Useful if you are hosting you app on Posit Connect instead of locally.  
+---
+
+# Creating Your Own Database and Column Info
+
+To use the package with your own database, you need to:
+
+1. **Create a database connection pool**
+2. **Generate column metadata** using `create_column_info()`
+
+## Example: Setting Up Your Own Data
+
+```{r, eval = FALSE}
+library(shinydbanalysis)
+library(duckdb)
+library(pool)
+library(ggplot2)
+library(dplyr)
+
+# Create a DuckDB connection pool
+pool <- dbPool(
+  drv = duckdb::duckdb(),
+  dbdir = ":memory:"  # or path to a file: "my_database.duckdb"
+)
+
+# Load your datasets
+dbWriteTable(pool, "diamonds", ggplot2::diamonds)
+dbWriteTable(pool, "iris", iris)
+
+# Create directory for column metadata
+dir.create("column_info", showWarnings = FALSE)
+
+# Generate column information for each table
+# This pre-computes column types, distinct values, etc.
+create_column_info("diamonds", pool, 
+                   storage_type = "local",
+                   column_info_dir = "column_info")
+
+create_column_info("iris", pool,
+                   storage_type = "local", 
+                   column_info_dir = "column_info")
+
+
+# Create storage info configuration
+storage_info <- list(
+  storage_type = "local",
+  column_info_dir = "column_info",
+  adls_endpoint = NULL,
+  adls_container = NULL,
+  sas_token = NULL
+)
+
+
+# Now launch the app with your data
+demo_shinydbanalysis_app(
+  pool = pool,
+  storage_info  = storage_info
+)
+```
+
+## Using ADLS (Azure Data Lake Storage) for Column Info
+
+If hosting your app on Posit Connect or other cloud platforms, you can store column info in Azure Data Lake Storage:  
 
 ```{r,eval = FALSE}
-
-# ADLS version
+# Create column info and store in ADLS
 shinydbanalysis::create_column_info(
   tablename = "myschema.iris", 
   pool = pool,
   storage_type = "adls",
   column_info_dir = "column_info",
   adls_endpoint = "https://myadlsenpoint.blob.core.windows.net/", 
-  adls_container =Sys.getenv("adls_container"),
+  adls_container = Sys.getenv("adls_container"),
   sas_token = Sys.getenv("sas_token_dev"))
 
 
-demo_shinydbanalysis_app(
-  pool = pool,
+
+# Create storage info configuration
+storage_info <- list(
   storage_type = "adls",
-  column_info_dir = "column_info", 
+  column_info_dir = "column_info",
   adls_endpoint = "https://myadlsenpoint.blob.core.windows.net/", 
-  adls_container =Sys.getenv("adls_container"),
+  adls_container = Sys.getenv("adls_container"),
   sas_token = Sys.getenv("sas_token_dev"))
 )
+
+
+
+# Launch demo app with ADLS storage
+demo_shinydbanalysis_app(
+  pool = pool,
+  storage_info = storage_info
+)
+  
 ```
 
 
@@ -155,10 +202,20 @@ You may want to restrict the users from accessing certain columns without modify
 
 
 ```{r, eval = FALSE}
-demo_shinydbanalysis_app(
-  pool = pool,
+storage_info <- list(
   storage_type = "local",
   column_info_dir = "column_info",
+  adls_endpoint = NULL,
+  adls_container = NULL,
+  sas_token = NULL
+)
+
+
+
+
+demo_shinydbanalysis_app(
+  pool = pool,
+  storage_info = storage_info,
   restricted_columns = c("continent")
 )
 ```
@@ -328,13 +385,16 @@ create_column_info(
   column_info_dir = "column_info"
 )
 
-# Launch the app with explicit storage configuration
-demo_shinydbanalysis_app(
-  pool = pool,
+storage_info <-  list(
   storage_type = "local",
   column_info_dir = "column_info"
 )
 
+# Launch the app with explicit storage configuration
+demo_shinydbanalysis_app(
+  pool = pool,
+  storage_info = storage_info
+)
 ```
 
 

@@ -2,27 +2,33 @@
 % Please edit documentation in R/demo_shinydbanalysis_app_all_in_one_module.R
 \name{demo_shinydbanalysis_app_all_in_one_module}
 \alias{demo_shinydbanalysis_app_all_in_one_module}
-\title{demo_shinydbanalysis_app_all_in_one_module}
+\title{Run All-in-One Module Demo App}
 \usage{
 demo_shinydbanalysis_app_all_in_one_module(
   pool,
   storage_info,
-  restricted_columns
+  restricted_columns = character(0)
 )
 }
 \arguments{
-\item{pool}{}
+\item{pool}{A database connection pool object.}
 
-\item{storage_info}{}
+\item{storage_info}{A list with storage configuration.}
 
-\item{restricted_columns}{}
+\item{restricted_columns}{Character vector of column names to restrict from user access. Defaults to none.}
+}
+\value{
+A Shiny app object
 }
 \description{
-demo_shinydbanalysis_app_all_in_one_module
+Launches a simplified demo app using a single reusable module with the pre-packaged demo database by default.
+No arguments are required for the demo - just call \code{demo_shinydbanalysis_app_all_in_one_module()}.
 }
 \examples{
-library(bslib)
-storage_info <- list(  storage_type = "local",column_info_dir = "column_info")
-restricted_columns <- character(0)
-demo_shinydbanalysis_app_all_in_one_module(pool, storage_info, restricted_columns)
+# Zero-configuration demo using pre-packaged data
+if (interactive()) {
+  library(bslib)
+  demo_shinydbanalysis_app_all_in_one_module(pool = get_demo_pool(), storage_info = get_demo_storage_info())
+}
+
 }

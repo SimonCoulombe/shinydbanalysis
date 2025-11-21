@@ -1,37 +1,25 @@
 #' Run the Shiny Database Analysis Application
 #'
-#' @param pool A database connection pool object
-#' @param storage_type Either "local" or "adls"
-#' @param column_info_dir Path for storing column info parquet files on either local or adls container (default: "column_info")
-#' @param adls_endpoint ADLS endpoint URL (required if storage_type = "adls")
-#' @param adls_container ADLS container name (required if storage_type = "adls")
-#' @param sas_token ADLS SAS token (required if storage_type = "adls")
+#' Launches a full-featured demo app with the pre-packaged demo database by default.
+#' No arguments are required for the demo - just call `demo_shinydbanalysis_app()`.
+#'
+#' @param pool A database connection pool object. 
+#' @param storage_info A list with storage configuration. 
+#' @param restricted_columns Character vector of column names to restrict from user access. Defaults to none.
+#'
+#' @return A Shiny app object
 #' @export
+#'
+#' @examples
+#' # Zero-configuration demo using pre-packaged data
+#' if (interactive()) {
+#'   demo_shinydbanalysis_app(pool = get_demo_pool(), storage_info = get_demo_storage_info())
+#' }
 demo_shinydbanalysis_app <- function(pool,
-                                     storage_type = "local",
-                                     column_info_dir = "column_info",
-                                     adls_endpoint = NULL,
-                                     adls_container = NULL,
-                                     sas_token = NULL,
+                                     storage_info,
                                      restricted_columns = character(0)) {
-  # Validate storage configuration
-  storage_type <- match.arg(storage_type, c("local", "adls"))
   
-  if (storage_type == "adls") {
-    if (is.null(adls_endpoint) || is.null(adls_container) || is.null(sas_token)) {
-      stop("ADLS endpoint, container, and SAS token are required when storage_type is 'adls'")
-    }
-  }
-  
-  # Create storage info list
-  storage_info <- list(
-    storage_type = storage_type,
-    column_info_dir = column_info_dir,
-    adls_endpoint = adls_endpoint,
-    adls_container = adls_container,
-    sas_token = sas_token
-  )
-  
+
   ui <- fluidPage(
     titlePanel("Dataset Analysis Tool"),
     

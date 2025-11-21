@@ -4,29 +4,25 @@
 \alias{demo_shinydbanalysis_app}
 \title{Run the Shiny Database Analysis Application}
 \usage{
-demo_shinydbanalysis_app(
-  pool,
-  storage_type = "local",
-  column_info_dir = "column_info",
-  adls_endpoint = NULL,
-  adls_container = NULL,
-  sas_token = NULL,
-  restricted_columns = character(0)
-)
+demo_shinydbanalysis_app(pool, storage_info, restricted_columns = character(0))
 }
 \arguments{
-\item{pool}{A database connection pool object}
+\item{pool}{A database connection pool object.}
 
-\item{storage_type}{Either "local" or "adls"}
+\item{storage_info}{A list with storage configuration.}
 
-\item{column_info_dir}{Path for storing column info parquet files on either local or adls container (default: "column_info")}
-
-\item{adls_endpoint}{ADLS endpoint URL (required if storage_type = "adls")}
-
-\item{adls_container}{ADLS container name (required if storage_type = "adls")}
-
-\item{sas_token}{ADLS SAS token (required if storage_type = "adls")}
+\item{restricted_columns}{Character vector of column names to restrict from user access. Defaults to none.}
+}
+\value{
+A Shiny app object
 }
 \description{
-Run the Shiny Database Analysis Application
+Launches a full-featured demo app with the pre-packaged demo database by default.
+No arguments are required for the demo - just call \code{demo_shinydbanalysis_app()}.
+}
+\examples{
+# Zero-configuration demo using pre-packaged data
+if (interactive()) {
+  demo_shinydbanalysis_app(pool = get_demo_pool(), column_info_dir =  get_demo_column_info_path())
+}
 }
